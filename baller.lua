@@ -29,7 +29,7 @@ function Player.new(world, x, y)
 
     instance.canJump = true
     instance.dashcolor = false
-
+    instance.dashcooldown = 0
     -- particles
     local pCanvas = love.graphics.newCanvas(8, 8)
     pCanvas:renderTo(function()
@@ -68,17 +68,27 @@ function Player.new(world, x, y)
     local starbounceCanvas = love.graphics.newCanvas(24, 24)
     starbounceCanvas:renderTo(function()
         love.graphics.clear()
-        love.graphics.setColor(0.635, 0, 1)
-        love.graphics.polygon("fill", 12, 4, 4, 20, 20, 20)
+        love.graphics.setColor(0.682, 0, 1)
+
+        local points = {}
+        local spikes = 5
+        for i = 1, spikes * 2 do
+            local angle = (i - 1) * math.pi / spikes
+            local r = (i % 2 == 0) and 10 or 5
+            points[#points + 1] = 12 + math.cos(angle) * r
+            points[#points + 1] = 12 + math.sin(angle) * r
+        end
+
+    love.graphics.polygon("fill", points)
     end)
 
     instance.starbouncePSystem = love.graphics.newParticleSystem(starbounceCanvas, 80)
     instance.starbouncePSystem:setParticleLifetime(0.5, 1.0)
     instance.starbouncePSystem:setEmissionRate(0)
-    instance.starbouncePSystem:setSpeed(200, 325)
+    instance.starbouncePSystem:setSpeed(350, 420)
     instance.starbouncePSystem:setSpread(math.pi * 2)
     instance.starbouncePSystem:setLinearDamping(2, 4)
-    instance.starbouncePSystem:setSizes(1.2, 0.4, 0)
+    instance.starbouncePSystem:setSizes(2.2, 1.4, 0)
     instance.starbouncePSystem:setColors(1, 1, 0.4, 0.9, 1, 1, 0.2, 0)
 
     return instance
@@ -94,7 +104,8 @@ function Player:draw()
 
     love.graphics.setColor(1, 1, 1, alpha)
     love.graphics.draw(self.pSystem, 0, 0)
-    
+    love.graphics.draw(self.damagePSystem, 0, 0)
+    love.graphics.draw(self.starbouncePSystem, 0, 0)
     if self.hp == 4 then
         self.currentImage = self.imagemint4
     elseif self.hp == 3 then
@@ -115,10 +126,22 @@ function Player:draw()
     local radius = self.shape:getRadius()
     local scaleX = (radius*2)/iw
     local scaleY = (radius*2)/ih
+
+    -- dash outline
+    if self.dashcooldown and self.dashcooldown > 0 then
+        local ratio = self.dashcooldown / 5
+        local alpha = 1 - ratio
+        local outlineRadius = radius + ratio * 100
+
+        love.graphics.setColor(0, 0, 1, alpha)
+        love.graphics.setLineWidth(6)
+        love.graphics.circle("line", px, py, outlineRadius-5)
+    end
+    love.graphics.setColor(1, 1, 1, 1)
     love.graphics.draw(self.currentImage,px,py,angle,scaleX,scaleY,iw/2,ih/2)
 
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.draw(self.damagePSystem, 0, 0)
+    
     local font = love.graphics.newFont("fonts/tiny5.ttf", 36)
     love.graphics.setFont(font)
     love.graphics.print("HP: " .. self.hp .. "/" .. self.maxHP, 25, 10)
@@ -146,6 +169,31 @@ function Player:jump()
         self.pSystem:setPosition(cx, cy)
         self.pSystem:emit(30)
     end
+end
+
+function Player:dash(dx, dy)
+    if self.dashcooldown > 0 then
+        return
+    end
+
+    if dx == 0 and dy == 0 then
+        -- fallback to current movement direction
+        local vx, vy = self.body:getLinearVelocity()
+        dx, dy = vx, vy
+        if dx == 0 and dy == 0 then
+            return
+        end
+    end
+
+    local length = math.sqrt(dx * dx + dy * dy)
+    dx = dx / length
+    dy = dy / length
+
+    local dashSpeed = 1200
+    self.body:setLinearVelocity(dx * dashSpeed, dy * dashSpeed)
+    self.dashcooldown = 5
+    self.starbouncePSystem:setPosition(self.body:getX(), self.body:getY())
+    self.starbouncePSystem:emit(10)
 end
 
 function Player:wallbounce()
@@ -179,13 +227,13 @@ function Player:wallbounce()
         self.body:setLinearVelocity(400, -350)
 
         self.starbouncePSystem:setPosition(cx, cy)
-        self.starbouncePSystem:emit(30)
+        self.starbouncePSystem:emit(3)
     elseif wallOnRight then
         local vx, vy = self.body:getLinearVelocity()
         self.body:setLinearVelocity(-400, -350)
 
         self.starbouncePSystem:setPosition(cx, cy)
-        self.starbouncePSystem:emit(30)
+        self.starbouncePSystem:emit(3)
     end
 end
 
@@ -209,7 +257,7 @@ function Player:OffStageRespawn()
     end
 end
 
-function Player:control(up, down, left, right, force)
+function Player:control(up, down, left, right, dash, force)
 
     function love.keyreleased(key)
         if key == up then
@@ -235,11 +283,32 @@ function Player:control(up, down, left, right, force)
     if love.keyboard.isDown(down) then
         self.body:applyForce(0, force*1.2)
     end
+
+    if love.keyboard.isDown(dash) then
+        local dx, dy = 0, 0
+        if love.keyboard.isDown("a") or love.keyboard.isDown("left") then
+            dx = dx - 1
+        end
+        if love.keyboard.isDown("d") or love.keyboard.isDown("right") then
+            dx = dx + 1
+        end
+        if love.keyboard.isDown("w") or love.keyboard.isDown("up") then
+            dy = dy - 1
+        end
+        if love.keyboard.isDown("s") or love.keyboard.isDown("down") then
+            dy = dy + 1
+        end
+        self:dash(dx,dy)
+    end
 end
 
 function Player:update(dt)
 
-    if self.invulnTimer and self.invulnTimer > 0 then
+    if self.dashcooldown > 0 then
+        self.dashcooldown = math.max(0, self.dashcooldown - dt)
+    end
+
+    if self.invulnTimer > 0 then
         self.invulnTimer = math.max(0, self.invulnTimer - dt)
     end
 

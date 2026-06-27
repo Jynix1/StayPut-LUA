@@ -1,6 +1,10 @@
 if os.getenv("LOVE2D_TOOLS") then pcall(require, "_love2d_tools_bridge") end
 
 local Player = require("baller")
+local object = require("objects")
+
+objects = {}
+
 local Menu = require("menu")
 
 function love.load()
@@ -38,10 +42,20 @@ end
 function love.update(dt)
     -- Only update gameplay if the menu is not visible
     if gameRunning then
+
+        for i = #objects, 1, -1 do
+        local obj = objects[i]
+        obj:update(dt)
+        if obj.lifetime <= 0 then
+            table.remove(objects, i)
+        end
+end
+
         world:update(dt)
         player:update(dt)
-        player:control("space","s","a","d",500)
+        player:control("space","s","a","d","lshift",500)
         player:OffStageRespawn()
+        -- !!!                                                                                                                                 !!!!!!!!!!!!!!!!!!!
     end
     
     -- Update the menu (handle input navigation) if it's visible
@@ -53,7 +67,13 @@ end
 function love.draw()
     -- Only render gameplay if the menu and settings are not visible
     if not menuVisible and not settingsVisible then
+
+        for _, obj in ipairs(objects) do
+            obj:draw()
+        end
+        
         player:draw()
+
         local fx = floorBody:getX()-300
         local fy = floorBody:getY()-62.5
         love.graphics.setLineStyle("smooth")
@@ -88,6 +108,10 @@ end
 
 -- Handle keyboard input for menu and game controls
 function love.keypressed(key)
+    if key == "e" then                                                                                                                  --placeholder dev spawn key
+        local newObject = object:new(533, 0, "square")
+        table.insert(objects, newObject)
+    end
     -- ESC toggles the menu visibility or closes settings
     if key == "escape" then
         if settingsVisible then

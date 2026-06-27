@@ -17,7 +17,7 @@ function love.load()
     player = Player.new(world, 533, 200)
 
     floorBody = love.physics.newBody(world, 533, 550, "static")
-    floorShape = love.physics.newRectangleShape(600,125 )
+    floorShape = love.physics.newRectangleShape(700,125 )
     floorFixture = love.physics.newFixture(floorBody, floorShape)
     floorFixture:setFriction(1)
     
@@ -74,11 +74,11 @@ function love.draw()
         
         player:draw()
 
-        local fx = floorBody:getX()-300
+        local fx = floorBody:getX()-350
         local fy = floorBody:getY()-62.5
         love.graphics.setLineStyle("smooth")
         love.graphics.setLineWidth(2)
-        love.graphics.rectangle("line",fx,fy,600,125)
+        love.graphics.rectangle("line",fx,fy,700,125)
     end
     
     -- Draw the menu if it's visible
@@ -108,8 +108,12 @@ end
 
 -- Handle keyboard input for menu and game controls
 function love.keypressed(key)
-    if key == "e" then                                                                                                                  --placeholder dev spawn key
+    if key == "1" then                                                                                                                  --placeholder dev spawn key
         local newObject = object:new(533, 0, "square")
+        table.insert(objects, newObject)
+    end
+    if key == "2" then                                                                                                                  --placeholder dev spawn key
+        local newObject = object:new(533, 0, "follower")
         table.insert(objects, newObject)
     end
     -- ESC toggles the menu visibility or closes settings

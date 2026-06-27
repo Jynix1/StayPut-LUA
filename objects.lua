@@ -11,7 +11,19 @@ function object:new(x, y, obj)
         instance.lifetime = 5
 
         instance.newBody = love.physics.newBody(world, x, y, "dynamic")
-        instance.shape = love.physics.newRectangleShape(50, 50)
+        instance.shape = love.physics.newRectangleShape(150, 150)
+        instance.fixture = love.physics.newFixture(instance.newBody, instance.shape, 2)
+
+        instance.newBody:setLinearDamping(0.5)
+        instance.newBody:setAngularDamping(2)
+
+    end
+
+    if obj == "follower" then
+        instance.lifetime = 8
+
+        instance.newBody = love.physics.newBody(world, x, y, "dynamic")
+        instance.shape = love.physics.newCircleShape(35)
         instance.fixture = love.physics.newFixture(instance.newBody, instance.shape, 1)
 
         instance.newBody:setLinearDamping(0.3)
@@ -24,21 +36,57 @@ function object:new(x, y, obj)
 end
 
 function object:draw()
+    if not self.newBody or not self.shape then
+        return
+    end
+
     if self.obj == "square" then
         love.graphics.setColor(1, 1, 1)
-        love.graphics.polygon("fill", self.newBody:getWorldPoints(self.shape:getPoints()))
+        love.graphics.setLineStyle("smooth")
+        love.graphics.setLineWidth(4)
+        love.graphics.polygon("line", self.newBody:getWorldPoints(self.shape:getPoints()))
+    elseif self.obj == "follower" then
+        love.graphics.setColor(0.8, 0.8, 1)
+        love.graphics.setLineStyle("smooth")
+        love.graphics.setLineWidth(8)
+        love.graphics.circle("line", self.newBody:getX(), self.newBody:getY(), self.shape:getRadius())
     end
 end
 
 function object:update(dt)
+    if not self.newBody or not self.shape then
+        return
+    end
 
-   self.lifetime = self.lifetime - dt
+    self.lifetime = self.lifetime - dt
 
     if self.lifetime <= 0 then
-         self.newBody:destroy()
-           self.newBody = nil
+        if self.newBody then
+            self.newBody:destroy()
+        end
+
+        self.newBody = nil
         self.shape = nil
-           self.fixture = nil
+        self.fixture = nil
+        return
+    end
+
+    if self.obj == "follower" then
+        local playerX, playerY = player.body:getPosition()
+        local followerX, followerY = self.newBody:getPosition()
+
+        local dx = playerX - followerX
+        local dy = playerY - followerY
+        local distance = math.sqrt(dx * dx + dy * dy)
+
+        if distance > 0 then
+            local forceMagnitude = 1100
+            local forceX = (dx / distance) * forceMagnitude
+            local forceY = (dy / distance) * forceMagnitude
+
+            self.newBody:applyForce(forceX, forceY)
+        end
+
     end
 
 end

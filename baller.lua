@@ -68,7 +68,7 @@ function Player.new(world, x, y)
     local starbounceCanvas = love.graphics.newCanvas(24, 24)
     starbounceCanvas:renderTo(function()
         love.graphics.clear()
-        love.graphics.setColor(0.682, 0, 1)
+        love.graphics.setColor(0.169, 0, 1)
 
         local points = {}
         local spikes = 5
@@ -95,11 +95,11 @@ function Player.new(world, x, y)
 end
 
 -- render player
-function Player:draw()
+function Player:draw()--------------------------------------------------------------------------------------------------------- DRAW function
 
     local alpha = 1
     if self.invulnTimer and self.invulnTimer > 0 then
-        alpha = 0.2 + 0.8 * math.abs(math.sin(love.timer.getTime() * 8))
+        alpha = 0.2 + 0.8 * math.abs(math.sin(love.timer.getTime() * 10))
     end
 
     love.graphics.setColor(1, 1, 1, alpha)
@@ -129,15 +129,15 @@ function Player:draw()
 
     -- dash outline
     if self.dashcooldown and self.dashcooldown > 0 then
-        local ratio = self.dashcooldown / 5
-        local alpha = 1 - ratio
+        local ratio = self.dashcooldown / 2.5
+        local alpha2 = 0.8 - ratio
         local outlineRadius = radius + ratio * 100
 
-        love.graphics.setColor(0, 0, 1, alpha)
+        love.graphics.setColor(0.9, 0.9, 1, alpha2)
         love.graphics.setLineWidth(6)
         love.graphics.circle("line", px, py, outlineRadius-5)
     end
-    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.setColor(1, 1, 1, alpha)
     love.graphics.draw(self.currentImage,px,py,angle,scaleX,scaleY,iw/2,ih/2)
 
     love.graphics.setColor(1, 1, 1, 1)
@@ -189,9 +189,9 @@ function Player:dash(dx, dy)
     dx = dx / length
     dy = dy / length
 
-    local dashSpeed = 1200
+    local dashSpeed = 900
     self.body:setLinearVelocity(dx * dashSpeed, dy * dashSpeed)
-    self.dashcooldown = 5
+    self.dashcooldown = 2.5
     self.starbouncePSystem:setPosition(self.body:getX(), self.body:getY())
     self.starbouncePSystem:emit(10)
 end
@@ -224,13 +224,13 @@ function Player:wallbounce()
 
     if wallOnLeft then
         local vx, vy = self.body:getLinearVelocity()
-        self.body:setLinearVelocity(400, -350)
+        self.body:setLinearVelocity(450, -350)
 
         self.starbouncePSystem:setPosition(cx, cy)
         self.starbouncePSystem:emit(3)
     elseif wallOnRight then
         local vx, vy = self.body:getLinearVelocity()
-        self.body:setLinearVelocity(-400, -350)
+        self.body:setLinearVelocity(-450, -350)
 
         self.starbouncePSystem:setPosition(cx, cy)
         self.starbouncePSystem:emit(3)

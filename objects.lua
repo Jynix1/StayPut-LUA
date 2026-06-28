@@ -8,14 +8,14 @@ function object:new(x, y, obj)
     instance.obj = obj
 
     if obj == "square" then
-        instance.lifetime = 5
+        instance.lifetime = 8
 
         instance.newBody = love.physics.newBody(world, x, y, "dynamic")
         instance.shape = love.physics.newRectangleShape(150, 150)
         instance.fixture = love.physics.newFixture(instance.newBody, instance.shape, 2)
 
         instance.newBody:setLinearDamping(0.5)
-        instance.newBody:setAngularDamping(2)
+        instance.newBody:setAngularDamping(0.5)
 
     end
 
@@ -23,10 +23,10 @@ function object:new(x, y, obj)
         instance.lifetime = 8
 
         instance.newBody = love.physics.newBody(world, x, y, "dynamic")
-        instance.shape = love.physics.newCircleShape(35)
+        instance.shape = love.physics.newCircleShape(25)
         instance.fixture = love.physics.newFixture(instance.newBody, instance.shape, 1)
 
-        instance.newBody:setLinearDamping(0.3)
+        instance.newBody:setLinearDamping(1)
         instance.newBody:setAngularDamping(2)
 
     end
@@ -64,7 +64,6 @@ function object:update(dt)
         if self.newBody then
             self.newBody:destroy()
         end
-
         self.newBody = nil
         self.shape = nil
         self.fixture = nil
@@ -80,15 +79,46 @@ function object:update(dt)
         local distance = math.sqrt(dx * dx + dy * dy)
 
         if distance > 0 then
-            local forceMagnitude = 1100
+            local forceMagnitude = 500
             local forceX = (dx / distance) * forceMagnitude
             local forceY = (dy / distance) * forceMagnitude
 
             self.newBody:applyForce(forceX, forceY)
+
+            -- if it falls too low, jump very high
+            if followerY > 650 then
+                self.newBody:applyLinearImpulse(0, -700)
+            end
+            if followerY < 0 then
+                self.newBody:applyLinearImpulse(0, 15)
+            end
+
+            -- simple obstacle check ahead, ignoring the player body
+            local checkX = followerX + (dx / distance) * 80
+            local checkY = followerY + (dy / distance) * 80
+
+            local hit = false
+            world:rayCast(followerX, followerY, checkX, checkY, function(fixture, x, y, xn, yn, fraction)
+                if fixture ~= player.fixture then
+                    hit = true
+                    return 1
+                end
+                return 1
+            end)
+
+            if hit and not self.jumpCooldown then
+                self.newBody:applyLinearImpulse(forceX * 0.2, forceMagnitude * -0.75)
+                self.jumpCooldown = 0.6
+            end
         end
 
+        if self.jumpCooldown then
+            self.jumpCooldown = self.jumpCooldown - dt
+            if self.jumpCooldown <= 0 then
+                self.jumpCooldown = nil
+            end
+        end
     end
-
 end
 
 return object

@@ -1,6 +1,9 @@
 local object = {}
 object.__index = object
 
+local Projectile = require("projectiles")
+projectiles = projectiles or {}
+
 function object:new(x, y, obj)
     local instance = setmetatable({}, object)
     instance.x = x
@@ -31,6 +34,26 @@ function object:new(x, y, obj)
 
     end
 
+    if obj == "bomb" then
+        instance.lifetime = 8
+
+        instance.newBody = love.physics.newBody(world, x, y, "kinematic")
+        instance.shape = love.physics.newCircleShape(40)
+        instance.fixture = love.physics.newFixture(instance.newBody, instance.shape, 1)
+        instance.fixture:setSensor(true)
+
+        instance.fusetime = 3 -- seconds until explosion
+        instance.timeafterexplostion = 0 -- seconds after explosion before removal
+        instance.exploded = false
+        
+        
+        instance.newBody:setLinearDamping(1)
+        instance.newBody:setAngularDamping(2)
+
+    end
+
+    instance.fixture:setUserData({ type = instance.obj, owner = instance })
+
  return instance
 
 end
@@ -50,6 +73,11 @@ function object:draw()
         love.graphics.setLineStyle("smooth")
         love.graphics.setLineWidth(8)
         love.graphics.circle("line", self.newBody:getX(), self.newBody:getY(), self.shape:getRadius())
+    elseif self.obj == "bomb" then
+        love.graphics.setColor(1, 0, 0.467)
+        love.graphics.setLineStyle("smooth")
+        love.graphics.setLineWidth(12)
+        love.graphics.circle("fill", self.newBody:getX(), self.newBody:getY(), self.shape:getRadius())
     end
 end
 
@@ -68,6 +96,36 @@ function object:update(dt)
         self.shape = nil
         self.fixture = nil
         return
+    end
+
+    if self.obj == "bomb" then
+        self.fusetime = self.fusetime - dt
+        if self.fusetime <= 0 and not self.exploded then
+            self.exploded = true
+
+            local bombX = self.newBody:getX()
+            local bombY = self.newBody:getY()
+        
+            if self.newBody then
+                self.newBody:destroy()
+            end
+            self.newBody = nil
+            self.shape = nil
+            self.fixture = nil
+
+            local numProjectiles = 16
+            local spawnDistance = 50  -- How far from bomb center to spawn
+
+            for i = 0, numProjectiles - 1 do
+                local angle = (i / numProjectiles) * math.pi * 2
+                local spawnX = bombX + math.cos(angle) * spawnDistance
+                local spawnY = bombY + math.sin(angle) * spawnDistance
+                local newProjectile = Projectile.new(world, spawnX, spawnY, angle, "bullet")
+                table.insert(projectiles, newProjectile)
+            
+            end
+        end
+
     end
 
     if self.obj == "follower" then

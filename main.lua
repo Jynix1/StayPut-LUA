@@ -30,13 +30,31 @@ function love.load()
     equipSound = love.audio.newSource("sounds/sfx/equip.mp3", "static")
 
     -- Game state flags
-    menuVisible = true   -- Is the menu currently shown? (starts with menu visible)
-    gameRunning = false  -- Is gameplay active (paused when menu is open)? (starts paused)
-    gameStarted = false  -- Has the game been started at least once?
-    settingsVisible = false  -- Is the settings menu shown?
+    menuVisible = true
+    gameRunning = false
+    gameStarted = false
+    settingsVisible = false
     
     -- Load font for settings menu
     settingsFont = love.graphics.newFont("fonts/tiny5.ttf", 36)
+
+    function beginContact(a, b, contact)
+        local dataA = a:getUserData()
+        local dataB = b:getUserData()
+
+        local projectile = nil
+
+        if dataA and dataA.type == "projectile" then
+            projectile = dataA.owner
+        elseif dataB and dataB.type == "projectile" then
+            projectile = dataB.owner
+        end
+
+        if projectile and not projectile.hasHit then
+            projectile.hasHit = true
+            projectile.lifetime = 0
+        end
+    end
 end
 
 function love.update(dt)
@@ -44,12 +62,23 @@ function love.update(dt)
     if gameRunning then
 
         for i = #objects, 1, -1 do
-        local obj = objects[i]
-        obj:update(dt)
-        if obj.lifetime <= 0 then
-            table.remove(objects, i)
+            local obj = objects[i]
+            obj:update(dt)
+            if obj.lifetime <= 0 then
+                table.remove(objects, i)
+            end
         end
-end
+
+        for i = #projectiles, 1, -1 do
+            local proj = projectiles[i]
+            proj:update(dt)
+            if proj.lifetime <= 0 then
+                if proj.body then
+                    proj.body:destroy()
+                end
+                table.remove(projectiles, i)
+            end
+        end
 
         world:update(dt)
         player:update(dt)
@@ -57,16 +86,19 @@ end
         player:OffStageRespawn()
         -- !!!                                                                                                                                 !!!!!!!!!!!!!!!!!!!
     end
-    
-    -- Update the menu (handle input navigation) if it's visible
+
     if menuVisible then
         menu:update()
     end
 end
 
 function love.draw()
-    -- Only render gameplay if the menu and settings are not visible
+
     if not menuVisible and not settingsVisible then
+
+        for _, proj in ipairs(projectiles) do
+            proj:draw()
+        end
 
         for _, obj in ipairs(objects) do
             obj:draw()
@@ -114,6 +146,10 @@ function love.keypressed(key)
     end
     if key == "2" then                                                                                                                  --placeholder dev spawn key
         local newObject = object:new(533, 0, "follower")
+        table.insert(objects, newObject)
+    end
+    if key == "3" then                                                                                                                  --placeholder dev spawn key
+        local newObject = object:new(533, 0, "bomb")
         table.insert(objects, newObject)
     end
     -- ESC toggles the menu visibility or closes settings
@@ -175,6 +211,3 @@ function love.keypressed(key)
     end
 end
 
--- TODO: Add objects/enemies. Add HP and "hp bar" for each REAL hp. 
--- (ex: getting hit by small projectiles only slightly damages you.
--- get hit by enough and youll take a real hit of damage.)

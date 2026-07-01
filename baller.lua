@@ -7,8 +7,12 @@ function Player.new(world, x, y)
 
     instance.hp = 4
     instance.maxHP = 4
+    instance.hpBar = 100
+    instance.hpBarMax = 100
     instance.invulnTimer = 0        -- seconds left of i-frames
-    instance.invulnDuration = 3     -- i-frames duration after taking damage
+    instance.invulnDuration = 3 
+    instance.backupinvulnduration = 0.05
+    instance.backupinvulntimer = 0
     instance.damageParticleDelay = 0
     instance.damageParticleDelayDuration = 1/60
 
@@ -19,6 +23,8 @@ function Player.new(world, x, y)
     instance.fixture:setFriction(0.9)
     instance.body:setLinearDamping(0.3)
     instance.body:setAngularDamping(2)
+
+    instance.fixture:setUserData({ type = "player", owner = instance })
 
     instance.imagemint0 = love.graphics.newImage("sprites/mint/mint0.png")
     instance.imagemint1 = love.graphics.newImage("sprites/mint/mint1.png")
@@ -142,6 +148,18 @@ function Player:draw()----------------------------------------------------------
 
     love.graphics.setColor(1, 1, 1, 1)
     
+    -- HP Bar (0-100)
+    local barX, barY, barW, barH = 25, 60, 200, 18
+    love.graphics.setColor(0, 0, 0, 0.6)
+    love.graphics.rectangle("fill", barX-2, barY-2, barW+4, barH+4)
+    -- fill color changes with percent
+    local pct = self.hpBar / self.hpBarMax
+    love.graphics.setColor(1, 0.2 * (1-pct), 0.2) -- greener when full, redder when low (tweak as desired)
+    local fillW = math.max(0, pct * barW)
+    love.graphics.rectangle("fill", barX, barY, fillW, barH)
+    love.graphics.setColor(1,1,1,1)
+    love.graphics.print(tostring(math.floor(self.hpBar)) .. "%", barX + barW + 8, barY - 10)
+    
     local font = love.graphics.newFont("fonts/tiny5.ttf", 36)
     love.graphics.setFont(font)
     love.graphics.print("HP: " .. self.hp .. "/" .. self.maxHP, 25, 10)
@@ -257,6 +275,25 @@ function Player:OffStageRespawn()
     end
 end
 
+function Player:takeBarDamage(amount)
+    if self.backupinvulntimer and self.backupinvulntimer > 0 then
+        return
+    end
+    if self.invulnTimer and self.invulnTimer > 0 then
+        return
+    end
+
+    self.hpBar = math.max(0, self.hpBar - amount)
+    self.backupinvulntimer = self.backupinvulnduration
+
+    if self.hpBar <= 0 then
+        self.hp = self.hp - 1
+        self.invulnTimer = self.invulnDuration
+        self.damageParticleDelay = self.damageParticleDelayDuration
+        self.hpBar = self.hpBarMax
+    end
+end
+
 function Player:control(up, down, left, right, dash, force)
 
     function love.keyreleased(key)
@@ -310,6 +347,10 @@ function Player:update(dt)
 
     if self.invulnTimer > 0 then
         self.invulnTimer = math.max(0, self.invulnTimer - dt)
+    end
+
+    if self.backupinvulntimer > 0 then
+        self.backupinvulntimer = math.max(0, self.backupinvulntimer - dt)
     end
 
     if self.damageParticleDelay and self.damageParticleDelay > 0 then

@@ -10,6 +10,21 @@ function object:new(x, y, obj)
     instance.y = y
     instance.obj = obj
 
+    local exCanvas = love.graphics.newCanvas(70, 70)
+    exCanvas:renderTo(function()
+        love.graphics.clear(0,0,0,0)
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.circle("fill", 35, 35, 35)
+    end)
+
+    instance.exParticleSystem = love.graphics.newParticleSystem(exCanvas, 100)
+    instance.exParticleSystem:setParticleLifetime(0.5, 1)
+    instance.exParticleSystem:setEmissionRate(0)
+    instance.exParticleSystem:setSizeVariation(1)
+    instance.exParticleSystem:setSpeed(100, 200)
+    instance.exParticleSystem:setSpread(math.pi * 2)
+    instance.exParticleSystem:setColors(1, 0, 0, 0.35, 0.25, 0, 1, 0)
+
     if obj == "square" then
         instance.lifetime = 8
 
@@ -37,16 +52,18 @@ function object:new(x, y, obj)
     if obj == "bomb" then
         instance.lifetime = 8
 
-        instance.newBody = love.physics.newBody(world, x, y, "kinematic")
+        instance.newBody = love.physics.newBody(world, x, y, "dynamic")
         instance.shape = love.physics.newCircleShape(40)
         instance.fixture = love.physics.newFixture(instance.newBody, instance.shape, 1)
-        instance.fixture:setSensor(true)
+        instance.newBody:setGravityScale(0.5) -- Reduce gravity effect on the bomb
+        instance.fixture:setRestitution(0.8) -- Make it bouncy
 
         instance.fusetime = 3 -- seconds until explosion
-        instance.timeafterexplostion = 0 -- seconds after explosion before removal
+        instance.timeafterexplostion = 2 -- seconds after explosion before removal
         instance.exploded = false
-        
-        
+        instance.lastX = 0
+        instance.lastY = 0
+
         instance.newBody:setLinearDamping(1)
         instance.newBody:setAngularDamping(2)
 
@@ -54,14 +71,16 @@ function object:new(x, y, obj)
 
     instance.fixture:setUserData({ type = instance.obj, owner = instance })
 
- return instance
-
+    return instance
 end
 
-function object:draw()
+function object:draw() ----------------                                                                                         --------- drawing
     if not self.newBody or not self.shape then
         return
     end
+
+    -- draw particle system centered on the 150x150 canvas at the body's position
+    love.graphics.draw(self.exParticleSystem, self.lastX, self.lastY, 0, 1, 1, 0,0)
 
     if self.obj == "square" then
         love.graphics.setColor(1, 1, 1)
@@ -74,10 +93,12 @@ function object:draw()
         love.graphics.setLineWidth(8)
         love.graphics.circle("line", self.newBody:getX(), self.newBody:getY(), self.shape:getRadius())
     elseif self.obj == "bomb" then
-        love.graphics.setColor(1, 0, 0.467)
-        love.graphics.setLineStyle("smooth")
-        love.graphics.setLineWidth(12)
-        love.graphics.circle("fill", self.newBody:getX(), self.newBody:getY(), self.shape:getRadius())
+        if self.exploded == false then
+            love.graphics.setColor(1, 0, 0.467)
+            love.graphics.setLineStyle("smooth")
+            love.graphics.setLineWidth(12)
+            love.graphics.circle("fill", self.newBody:getX(), self.newBody:getY(), self.shape:getRadius())
+        end
     end
 end
 
@@ -89,14 +110,22 @@ function object:update(dt)
     self.lifetime = self.lifetime - dt
 
     if self.lifetime <= 0 then
-        if self.newBody then
-            self.newBody:destroy()
-        end
-        self.newBody = nil
-        self.shape = nil
-        self.fixture = nil
+
+        self.timeafterexplostion = self.timeafterexplostion - dt
+
+        if self.timeafterexplostion <= 0 then
+            if self.newBody then
+                self.newBody:destroy()
+            end
+            self.newBody = nil
+            self.shape = nil
+            self.fixture = nil
         return
+
+        end
     end
+
+    self.exParticleSystem:update(dt)
 
     if self.obj == "bomb" then
         self.fusetime = self.fusetime - dt
@@ -105,15 +134,15 @@ function object:update(dt)
 
             local bombX = self.newBody:getX()
             local bombY = self.newBody:getY()
-        
-            if self.newBody then
-                self.newBody:destroy()
-            end
-            self.newBody = nil
-            self.shape = nil
-            self.fixture = nil
+            self.lastX = bombX
+            self.lastY = bombY
 
-            local numProjectiles = 16
+            if self.fixture then self.fixture:setSensor(true) end
+            if self.newBody then self.newBody:setActive(false) end
+            -- emit at PS-local origin (0,0). draw() will place the PS at the bomb coordinates
+            self.exParticleSystem:setPosition(0, 0)
+            self.exParticleSystem:emit(100)
+            local numProjectiles = 12
             local spawnDistance = 50  -- How far from bomb center to spawn
 
             for i = 0, numProjectiles - 1 do
@@ -122,10 +151,9 @@ function object:update(dt)
                 local spawnY = bombY + math.sin(angle) * spawnDistance
                 local newProjectile = Projectile.new(world, spawnX, spawnY, angle, "bullet")
                 table.insert(projectiles, newProjectile)
-            
             end
+            
         end
-
     end
 
     if self.obj == "follower" then

@@ -1,6 +1,15 @@
 local Player = {}
 Player.__index = Player
 
+-- debug ray visualization (temporary)
+local debugRays = {}
+local debugRayEnabled = false
+local function addDebugRay(x1,y1,x2,y2, hitX,hitY, nx,ny, ttl)
+    if not debugRayEnabled then return end
+    ttl = ttl or 0.12
+    table.insert(debugRays, {x1=x1,y1=y1,x2=x2,y2=y2, hitX=hitX, hitY=hitY, nx=nx, ny=ny, t=love.timer.getTime(), ttl=ttl})
+end
+
 -- new player
 function Player.new(world, x, y)
     local instance = setmetatable({}, Player)
@@ -15,6 +24,7 @@ function Player.new(world, x, y)
     instance.backupinvulntimer = 0
     instance.damageParticleDelay = 0
     instance.damageParticleDelayDuration = 1/60
+    instance.hpRefill = 0
 
     instance.body = love.physics.newBody(world, x, y, "dynamic")
     instance.shape = love.physics.newCircleShape(25)
@@ -36,6 +46,8 @@ function Player.new(world, x, y)
     instance.canJump = true
     instance.dashcolor = false
     instance.dashcooldown = 0
+    instance.hurtShakeTime = 0
+    instance.hurtShakeAmount = 6
     -- particles
     local pCanvas = love.graphics.newCanvas(8, 8)
     pCanvas:renderTo(function()
@@ -147,38 +159,56 @@ function Player:draw()----------------------------------------------------------
     love.graphics.draw(self.currentImage,px,py,angle,scaleX,scaleY,iw/2,ih/2)
 
     love.graphics.setColor(1, 1, 1, 1)
-    
-    -- HP Bar (0-100)
-    local barX, barY, barW, barH = 25, 60, 200, 18
-    love.graphics.setColor(0, 0, 0, 0.6)
-    love.graphics.rectangle("fill", barX-2, barY-2, barW+4, barH+4)
-    -- fill color changes with percent
-    local pct = self.hpBar / self.hpBarMax
-    love.graphics.setColor(1, 0.2 * (1-pct), 0.2) -- greener when full, redder when low (tweak as desired)
-    local fillW = math.max(0, pct * barW)
-    love.graphics.rectangle("fill", barX, barY, fillW, barH)
-    love.graphics.setColor(1,1,1,1)
-    love.graphics.print(tostring(math.floor(self.hpBar)) .. "%", barX + barW + 8, barY - 10)
-    
-    local font = love.graphics.newFont("fonts/tiny5.ttf", 36)
-    love.graphics.setFont(font)
-    love.graphics.print("HP: " .. self.hp .. "/" .. self.maxHP, 25, 10)
+
+    -- debug ray visualization
+    if debugRayEnabled then
+        for _, r in ipairs(debugRays) do
+            local age = love.timer.getTime() - r.t
+            local a = 1 - (age / r.ttl)
+            a = math.max(0, math.min(1, a))
+            love.graphics.setColor(1, 0, 0, a)
+            love.graphics.setLineWidth(2)
+            love.graphics.line(r.x1, r.y1, r.x2, r.y2)
+            if r.hitX then
+                love.graphics.setColor(1, 1, 0, a)
+                love.graphics.circle("fill", r.hitX, r.hitY, 3)
+                if r.nx and r.ny then
+                    love.graphics.setColor(0, 1, 0, a)
+                    love.graphics.line(r.hitX, r.hitY, r.hitX + r.nx * 12, r.hitY + r.ny * 12)
+                end
+            end
+        end
+        love.graphics.setColor(1,1,1,1)
+    end
+
+    self:HPbarDraw()
 
 end
 
 function Player:jump()
-    local cx = self.body:getX()
+    local cx = self.body:getX() - 20
     local cy = self.body:getY()
     local targetY = cy + 40
     local standingOnGround = false
-    world:rayCast(cx, cy, cx, targetY, function(fixture, x, y, xn, yn, fraction)
-        if fixture ~= self.fixture then
-            standingOnGround = true
-            return 0
-        end
 
-        return 1
-    end)
+    for i = 1, 5 do
+        local newX = cx + (i - 1) * 10
+
+        -- draw tentative ray (will be overwritten with hit info if any)
+        addDebugRay(newX, cy, newX, targetY, nil, nil, nil, nil, 0.12)
+
+        world:rayCast(newX, cy, newX, targetY, function(fixture, x, y, xn, yn, fraction)
+            if fixture ~= self.fixture then
+                standingOnGround = true
+                -- record hit for visualization
+                addDebugRay(newX, cy, newX, targetY, x, y, xn, yn, 1.2)
+                return 0
+            end
+
+            return 1
+        end)
+    end
+
     if standingOnGround then
         local vx,vy = self.body:getLinearVelocity()
         self.body:setLinearVelocity(vx, -600)
@@ -221,19 +251,21 @@ function Player:wallbounce()
     local targetXRight = cx + 35
     local wallOnLeft = false
     local wallOnRight = false
-
+    addDebugRay(cx, cy, targetXLeft, cy, nil, nil, nil, nil, 0.12)
     world:rayCast(cx, cy, targetXLeft, cy, function(fixture, x, y, xn, yn, fraction)
         if fixture ~= self.fixture then
             wallOnLeft = true
+            addDebugRay(cx, cy, targetXLeft, cy, x, y, xn, yn, 1.2)
             return 0
         end
 
         return 1
     end)
-
+    addDebugRay(cx, cy, targetXRight, cy, nil, nil, nil, nil, 0.12)
     world:rayCast(cx, cy, targetXRight, cy, function(fixture, x, y, xn, yn, fraction)
         if fixture ~= self.fixture then
             wallOnRight = true
+            addDebugRay(cx, cy, targetXRight, cy, x, y, xn, yn, 1.2)
             return 0
         end
 
@@ -258,21 +290,29 @@ end
 function Player:OffStageRespawn()
     if self.body:getY()>800 or self.body:getX()>1266 or self.body:getX()<-200 then
 
-        if (not self.invulnTimer) or self.invulnTimer <= 0 then
-            self.hp = self.hp - 1
-            self.invulnTimer = self.invulnDuration
-            self.damageParticleDelay = self.damageParticleDelayDuration
-
-            if self.hp <= 0 then
-                love.event.quit()
-            end
-        end
+        self:TakeDamage(1)
 
         self.body:setPosition(533, 200)
 
         self.body:setLinearVelocity(0, 0)
         self.body:setAngularVelocity(0)
     end
+end
+
+function Player:TakeDamage(amount)
+    if self.invulnTimer and self.invulnTimer > 0 then
+        return
+    end
+
+    self.hp = self.hp - 1
+    self.invulnTimer = self.invulnDuration
+    self.damageParticleDelay = self.damageParticleDelayDuration
+    self.hurtShakeTime = 0.12
+    
+    if self.hp <= 0 then
+        love.event.quit()  ------------------------------------------------------ death event
+    end
+    
 end
 
 function Player:takeBarDamage(amount)
@@ -285,20 +325,25 @@ function Player:takeBarDamage(amount)
 
     self.hpBar = math.max(0, self.hpBar - amount)
     self.backupinvulntimer = self.backupinvulnduration
+    self.hurtShakeTime = 0.12
 
     if self.hpBar <= 0 then
-        self.hp = self.hp - 1
-        self.invulnTimer = self.invulnDuration
+
+        self:TakeDamage(1)
+
         self.damageParticleDelay = self.damageParticleDelayDuration
         self.hpBar = self.hpBarMax
     end
 end
 
-function Player:control(up, down, left, right, dash, force)
+function Player:control(up, down, left, right, dash, force)                         -------------------------------------------- player control
 
     function love.keyreleased(key)
         if key == up then
             self.canJump = true
+        end
+        if key == "f3" then
+            debugRayEnabled = not debugRayEnabled
         end
     end
 
@@ -318,7 +363,7 @@ function Player:control(up, down, left, right, dash, force)
     end
 
     if love.keyboard.isDown(down) then
-        self.body:applyForce(0, force*1.2)
+        self.body:applyForce(0, force*2)
     end
 
     if love.keyboard.isDown(dash) then
@@ -339,7 +384,7 @@ function Player:control(up, down, left, right, dash, force)
     end
 end
 
-function Player:update(dt)
+function Player:update(dt)                                                     --------------------------------------------------- Player Update
 
     if self.dashcooldown > 0 then
         self.dashcooldown = math.max(0, self.dashcooldown - dt)
@@ -363,9 +408,21 @@ function Player:update(dt)
         end
     end
 
+    if self.hurtShakeTime and self.hurtShakeTime > 0 then
+        self.hurtShakeTime = math.max(0, self.hurtShakeTime - dt)
+    end
+
     self.pSystem:update(dt)
     self.damagePSystem:update(dt)
     self.starbouncePSystem:update(dt)
+
+    -- prune debug rays
+    local now = love.timer.getTime()
+    for i = #debugRays, 1, -1 do
+        if now - debugRays[i].t > debugRays[i].ttl then
+            table.remove(debugRays, i)
+        end
+    end
 
     local px = self.body:getX()
     local py = self.body:getY()
@@ -377,6 +434,61 @@ function Player:update(dt)
         self.pSystem:emit(1)
     end
 
+    if self.hpBar < 100 then
+       self.hpRefill = self.hpRefill + dt
+       if self.hpRefill >= 1.5 then
+           self.hpBar = math.min(self.hpBarMax, self.hpBar + 1)
+           self.hpRefill = 0
+       end 
+    end
+end
+
+function Player:HPbarDraw()
+    local hpBar = self.hpBar or 100
+    local hpBarMax = self.hpBarMax or 100
+    local pct = math.max(0, math.min(1, hpBar / hpBarMax))
+
+    local barX, barY, barW, barH = 25, 60, 200, 18
+    local fillW = math.max(0, pct * barW)
+
+    local shakeTime = self.hurtShakeTime or 0
+    local shakeAmount = self.hurtShakeAmount or 0
+    local shake = shakeTime > 0 and math.min(1, shakeTime / 0.12) or 0
+    local offsetX = ((math.random() * 2) - 1) * shakeAmount * shake
+    local offsetY = ((math.random() * 2) - 1) * shakeAmount * shake
+
+    love.graphics.push()
+    love.graphics.translate(offsetX, offsetY)
+
+    love.graphics.setLineWidth(3)
+    love.graphics.setLineStyle("rough")
+
+    love.graphics.setColor(0, 0, 0, 0.6)
+    love.graphics.rectangle("fill", barX - 2, barY - 2, barW + 4, barH + 4)
+
+    love.graphics.setColor(1, 0.2 * (1 - pct), 0.2)
+    love.graphics.rectangle("fill", barX, barY, fillW, barH)
+
+    if self.invulnTimer and self.invulnTimer > 0 then
+        love.graphics.setColor(0, 0.882, 1)
+    else
+        love.graphics.setColor(1, 1, 1, 1)
+    end
+    love.graphics.rectangle("line", barX, barY, barW, barH)
+
+    local font = love.graphics.newFont("fonts/tiny5.ttf", 30)
+    love.graphics.setFont(font)
+    
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.print(tostring(math.floor(hpBar)) .. "%", barX + barW + 12, barY - 8)
+
+
+    font = love.graphics.newFont("fonts/tiny5.ttf", 36)
+    love.graphics.setFont(font)
+
+    love.graphics.print("HP: " .. (self.hp or 0) .. "/" .. (self.maxHP or 4), 35, 10)
+
+    love.graphics.pop()
 end
 
 return Player

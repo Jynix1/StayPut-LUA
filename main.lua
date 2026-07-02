@@ -1,3 +1,9 @@
+-- StayPut. A passion project made to learn Lua and LÖVE2D.
+-- Originating from a game made in TurboWarp/Scratch. This is a rewrite of the original game in Lua using the LÖVE2D framework.
+-- AI partially used to assist learning.
+
+-- yay! :3
+
 if os.getenv("LOVE2D_TOOLS") then pcall(require, "_love2d_tools_bridge") end
 
 local Player = require("baller")
@@ -29,13 +35,11 @@ function love.load()
     selectSound = love.audio.newSource("sounds/sfx/select.mp3", "static")
     equipSound = love.audio.newSource("sounds/sfx/equip.mp3", "static")
 
-    -- Game state flags
     menuVisible = true
     gameRunning = false
     gameStarted = false
     settingsVisible = false
     
-    -- Load font for settings menu
     settingsFont = love.graphics.newFont("fonts/tiny5.ttf", 36)
 
     function beginContact(a, b, contact)
@@ -58,7 +62,7 @@ function love.load()
 end
 
 function love.update(dt)
-    -- Only update gameplay if the menu is not visible
+
     if gameRunning then
 
         for i = #objects, 1, -1 do
@@ -152,20 +156,18 @@ function love.keypressed(key)
         local newObject = object:new(533, 0, "bomb")
         table.insert(objects, newObject)
     end
-    -- ESC toggles the menu visibility or closes settings
+
     if key == "escape" then
         if settingsVisible then
-            -- Close settings and return to main menu
             settingsVisible = false
             menuVisible = true
         else
-            -- Toggle main menu
             menuVisible = not menuVisible
             gameRunning = not gameRunning
         end
-        return  -- Don't process other input when toggling menu
+        return
     end
-    
+
     -- Handle menu navigation (up/down) when menu is visible
     if menuVisible and not settingsVisible then
         if key == "up" or key == "w" then  
@@ -178,36 +180,31 @@ function love.keypressed(key)
             return
         end
     end
-    
+
     -- Handle menu item selection when menu is visible
     if menuVisible and not settingsVisible and (key == "return" or key == "z") then
+
         selectSound:play()
         local selectedItem = menu:getSelectedItem()
-        
+
         if selectedItem == "Start Game" or selectedItem == "Resume Game" then
             menuVisible = false
             gameRunning = true
             gameStarted = true
             menu:setGameStarted(true)
-            
+
         elseif selectedItem == "Settings" then
             if not gameStarted then
-                -- Open the settings menu
                 menuVisible = false
                 settingsVisible = true
             else
-                errorSound:play()  -- Play error sound
-                -- Gray out Settings button when game has not been started
-                -- Do nothing (or show a message if desired)
+                errorSound:play()
             end
         elseif selectedItem == "StayPut Made With TurboWarp" then
-            -- Open an external URL
             love.system.openURL("https://stayput.my.canva.site/")
             
         elseif selectedItem == "Quit" then
-            -- Close the game
             love.event.quit()
         end
     end
 end
-

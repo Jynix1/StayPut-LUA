@@ -10,11 +10,11 @@ function Projectile.new(world, x, y, direction, type)
     self.hasHit = false -- Track if it's already hit the player
 
     if type == "bullet" then
-        self.speed = 300
+        self.speed = 275
         self.damage = 19
         self.lifetime = 4
         self.shape = "circle"
-        self.radius = 8
+        self.radius = 11
         
         -- Create kinematic body (unaffected by gravity/forces)
         self.body = love.physics.newBody(world, x, y, "kinematic")

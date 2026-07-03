@@ -198,7 +198,8 @@ function Player:jump()
         addDebugRay(newX, cy, newX, targetY, nil, nil, nil, nil, 0.12)
 
         world:rayCast(newX, cy, newX, targetY, function(fixture, x, y, xn, yn, fraction)
-            if fixture ~= self.fixture then
+            -- ignore player's own fixture and any sensor fixtures (projectiles, etc.)
+            if fixture ~= self.fixture and not fixture:isSensor() then
                 standingOnGround = true
                 -- record hit for visualization
                 addDebugRay(newX, cy, newX, targetY, x, y, xn, yn, 1.2)
@@ -253,7 +254,7 @@ function Player:wallbounce()
     local wallOnRight = false
     addDebugRay(cx, cy, targetXLeft, cy, nil, nil, nil, nil, 0.12)
     world:rayCast(cx, cy, targetXLeft, cy, function(fixture, x, y, xn, yn, fraction)
-        if fixture ~= self.fixture then
+        if fixture ~= self.fixture and not fixture:isSensor() then
             wallOnLeft = true
             addDebugRay(cx, cy, targetXLeft, cy, x, y, xn, yn, 1.2)
             return 0
@@ -263,7 +264,7 @@ function Player:wallbounce()
     end)
     addDebugRay(cx, cy, targetXRight, cy, nil, nil, nil, nil, 0.12)
     world:rayCast(cx, cy, targetXRight, cy, function(fixture, x, y, xn, yn, fraction)
-        if fixture ~= self.fixture then
+        if fixture ~= self.fixture and not fixture:isSensor() then
             wallOnRight = true
             addDebugRay(cx, cy, targetXRight, cy, x, y, xn, yn, 1.2)
             return 0

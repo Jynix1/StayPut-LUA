@@ -59,7 +59,7 @@ function object:new(x, y, obj)
         instance.fixture:setRestitution(0.8) -- Make it bouncy
 
         instance.fusetime = 3 -- seconds until explosion
-        instance.timeafterexplostion = 2 -- seconds after explosion before removal
+        instance.timeAfterExplosion = 2 -- seconds after explosion before removal
         instance.exploded = false
         instance.lastX = 0
         instance.lastY = 0
@@ -82,22 +82,50 @@ function object:draw() ----------------                                         
     -- draw particle system centered on the 150x150 canvas at the body's position
     love.graphics.draw(self.exParticleSystem, self.lastX, self.lastY, 0, 1, 1, 0,0)
 
+    local alpha = 1
+    if self.lifetime and self.lifetime < 2 then
+        alpha = 0.3 + 0.7 * (0.5 + 0.5 * math.sin(love.timer.getTime() * 20))
+    end
+
     if self.obj == "square" then
-        love.graphics.setColor(1, 1, 1)
+        love.graphics.setColor(1, 1, 1, alpha)
         love.graphics.setLineStyle("smooth")
         love.graphics.setLineWidth(4)
         love.graphics.polygon("line", self.newBody:getWorldPoints(self.shape:getPoints()))
+        love.graphics.setColor(1, 1, 1, 1)
     elseif self.obj == "follower" then
-        love.graphics.setColor(0.8, 0.8, 1)
+        love.graphics.setColor(0.8, 0.8, 1, alpha)
         love.graphics.setLineStyle("smooth")
         love.graphics.setLineWidth(8)
         love.graphics.circle("line", self.newBody:getX(), self.newBody:getY(), self.shape:getRadius())
+        love.graphics.setColor(1, 1, 1, 1)
     elseif self.obj == "bomb" then
         if self.exploded == false then
-            love.graphics.setColor(1, 0, 0.467)
-            love.graphics.setLineStyle("smooth")
+            local cx, cy = self.newBody:getX(), self.newBody:getY()
+            local r = self.shape:getRadius() - 4
+            local rot = self.newBody:getAngle()
+
+            love.graphics.setColor(1, 0.2, 0.3, alpha)
             love.graphics.setLineWidth(12)
-            love.graphics.circle("fill", self.newBody:getX(), self.newBody:getY(), self.shape:getRadius())
+            love.graphics.setLineStyle("smooth")
+            love.graphics.circle("line", cx, cy, r)
+
+            local spikes = 12
+            local spikeL = r * 0.3
+            local baseInsert = 1
+            love.graphics.setColor(0.9, 0.1, 0.2, alpha)
+            for i = 0, spikes - 1 do
+                local ang = (i / spikes) * math.pi * 2 + rot
+                local baseAngOffset = (math.pi / spikes) * 2
+                local bx1 = cx + math.cos(ang - baseAngOffset) * (r - baseInsert)
+                local by1 = cy + math.sin(ang - baseAngOffset) * (r - baseInsert)
+                local bx2 = cx + math.cos(ang + baseAngOffset) * (r - baseInsert)
+                local by2 = cy + math.sin(ang + baseAngOffset) * (r - baseInsert)
+                local tipx = cx + math.cos(ang) * (r + spikeL)
+                local tipy = cy + math.sin(ang) * (r + spikeL)
+                love.graphics.polygon("fill", bx1, by1, bx2, by2, tipx, tipy)
+            end
+            love.graphics.setColor(1, 1, 1, 1)
         end
     end
 end
@@ -110,18 +138,21 @@ function object:update(dt)
     self.lifetime = self.lifetime - dt
 
     if self.lifetime <= 0 then
-
-        self.timeafterexplostion = self.timeafterexplostion - dt
-
-        if self.timeafterexplostion <= 0 then
+        if self.timeAfterExplosion then
+            self.timeAfterExplosion = self.timeAfterExplosion - dt
+            if self.timeAfterExplosion <= 0 then
+                if self.newBody then
+                    self.newBody:destroy()
+                end
+                self.newBody, self.shape, self.fixture = nil, nil, nil
+                return
+            end
+        else
             if self.newBody then
                 self.newBody:destroy()
             end
-            self.newBody = nil
-            self.shape = nil
-            self.fixture = nil
-        return
-
+            self.newBody, self.shape, self.fixture = nil, nil, nil
+            return
         end
     end
 
@@ -134,16 +165,26 @@ function object:update(dt)
 
             local bombX = self.newBody:getX()
             local bombY = self.newBody:getY()
+            local r = self.shape:getRadius()
             self.lastX = bombX
             self.lastY = bombY
 
             if self.fixture then self.fixture:setSensor(true) end
             if self.newBody then self.newBody:setActive(false) end
+
+            world:queryBoundingBox(bombX - r - 20, bombY - r - 20, bombX + r + 20, bombY + r + 20, function(fixture)
+                local body = fixture:getBody()
+                if body ~= self.newBody then
+                    body:setAwake(true)
+                end
+                return true
+            end)
+
             -- emit at PS-local origin (0,0). draw() will place the PS at the bomb coordinates
             self.exParticleSystem:setPosition(0, 0)
             self.exParticleSystem:emit(100)
             local numProjectiles = 12
-            local spawnDistance = 50  -- How far from bomb center to spawn
+            local spawnDistance = 5  -- How far from bomb center to spawn
 
             for i = 0, numProjectiles - 1 do
                 local angle = (i / numProjectiles) * math.pi * 2

@@ -7,15 +7,74 @@ if os.getenv("LOVE2D_TOOLS") then pcall(require, "_love2d_tools_bridge") end
 local Player = require("baller")
 local object = require("objects")
 
+RoundData =
+{
+
+    ongoing = true,
+
+    level = 0,
+    time = 1,
+    starttime = 20,
+
+    difficultyTBO = 3,
+    spawnTimer = 3,
+
+    enemyPicker = false,
+    enemiesActive = {}
+
+}
+
+EnemyOptions =
+{
+    { id = "square", title = "Square", desc = "A heavy box. Falls to get in your way.", cd = -1 },
+    { id = "follower", title = "Follower", desc = "Follows and pushes the player.", cd = 0 },
+    { id = "bomb", title = "Bomb", desc = "Weak object, explodes with projectiles in all directions.", cd = 1 }
+}
+
+local ChoiceButtons = {
+    { x = 115, y = 100, width = 240, height = 200, id = "", title = "", desc = "" },
+    { x = 413, y = 100, width = 240, height = 200, id = "", title = "", desc = "" },
+    { x = 711, y = 100, width = 240, height = 200, id = "", title = "", desc = "" }
+}
+
+local function refreshChoiceButtons()
+    
+    local pool = {}
+    for i, option in ipairs(EnemyOptions) do 
+        local alreadyingame = false
+
+        for _, activeId in ipairs(RoundData.enemiesActive) do
+            if option.id == activeId then
+                alreadyingame = true
+            end
+        end
+
+        if not alreadyingame then
+            table.insert(pool,option)
+        end
+
+    end
+    
+    for i = 1, 3 do
+        if #pool == 0 then break end
+        local randomIndex = love.math.random(1,#pool)
+        local chosenEnemy = table.remove(pool, randomIndex)
+
+        ChoiceButtons[i].id = chosenEnemy.id
+        ChoiceButtons[i].title = chosenEnemy.title
+        ChoiceButtons[i].desc = chosenEnemy.desc
+    end
+end
+
 objects = {}
-local spawnHold = {}
-local spawnHoldDelay = 0.75
-local spawnHoldRepeatInterval = 0.01
-local spawnKeyConfig = {
+local spawnHold = {}                               --                                         -----------------------  Dev utility to spawn stuff                            
+local spawnHoldDelay = 0.75                        --
+local spawnHoldRepeatInterval = 0.01               --
+local spawnKeyConfig = {                           --
     ["1"] = "square",
     ["2"] = "follower",
     ["3"] = "bomb",
-}
+}                                                  --
 
 local Menu = require("menu")
 local discordRPC = require("discordRPC")
@@ -57,8 +116,6 @@ function love.load()
     love.physics.setMeter(64)
     world = love.physics.newWorld(0, 15 * 64, true)
 
-    player = Player.new(world, 533, 200)
-
     floorBody = love.physics.newBody(world, 533, 550, "static")
     floorShape = love.physics.newRectangleShape(700,125 )
     floorFixture = love.physics.newFixture(floorBody, floorShape)
@@ -69,6 +126,8 @@ function love.load()
 
     errorSound = love.audio.newSource("sounds/sfx/error.mp3", "static")
     movemenuSound = love.audio.newSource("sounds/sfx/move.mp3", "static")
+    IntroSound = love.audio.newSource("sounds/sfx/move.mp3", "static")
+    IntroSound2 = love.audio.newSource("sounds/sfx/select.mp3", "static")
     selectSound = love.audio.newSource("sounds/sfx/select.mp3", "static")
     equipSound = love.audio.newSource("sounds/sfx/equip.mp3", "static")
 
@@ -76,6 +135,20 @@ function love.load()
     gameRunning = false
     gameStarted = false
     settingsVisible = false
+    IntroPlaying = false
+    IntroFrame = 1
+    IntroFrameDelay = 0.5
+    IntroPlayedBefore = false
+
+    IntroFrames = {
+        love.graphics.newImage("sprites/mspawn/mspawn1.png"),
+        love.graphics.newImage("sprites/mspawn/mspawn2.png"),
+        love.graphics.newImage("sprites/mspawn/mspawn3.png"),
+        love.graphics.newImage("sprites/mspawn/mspawn4.png"),
+        love.graphics.newImage("sprites/mspawn/mspawn4.png"),
+    }
+
+    player = Player.new(world, 533, 200)
 
     discordPresenceStart = os.time()
     if discordRPC.available and discordAppId and discordAppId ~= "" then
@@ -87,6 +160,8 @@ function love.load()
     updateDiscordPresence()
     
     settingsFont = love.graphics.newFont("fonts/tiny5.ttf", 36)
+    tobyfont = love.graphics.newFont("fonts/toby.otf",32)
+    smalltobyfont = love.graphics.newFont("fonts/toby.otf",18)
 
     function beginContact(a, b, contact)
         local dataA = a:getUserData()
@@ -109,12 +184,13 @@ function love.load()
     print("discordRPC.status =", discordRPC.status)
 end
 
-function love.update(dt)
+function love.update(dt)--                                                                                               ----  v v v  | main game loop |  v v v  ----
+
     if discordEnabled then
         discordRPC.runCallbacks()
     end
 
-    for key, objType in pairs(spawnKeyConfig) do  --------------------------------------------              place holder dev key
+    for key, objType in pairs(spawnKeyConfig) do  --------------------------------------------  place holder dev key
         if love.keyboard.isDown(key) then
             local data = spawnHold[key]
             if not data then
@@ -140,32 +216,75 @@ function love.update(dt)
     end
 
     if gameRunning then
+        if not IntroPlaying or IntroPlayedBefore then
+            IntroPlaying = false
 
-        for i = #objects, 1, -1 do
-            local obj = objects[i]
-            obj:update(dt)
-            if obj.lifetime <= 0 then
-                table.remove(objects, i)
-            end
-        end
-
-        for i = #projectiles, 1, -1 do
-            local proj = projectiles[i]
-            proj:update(dt)
-            if proj.lifetime <= 0 then
-                if proj.body then
-                    proj.body:destroy()
+            for i = #objects, 1, -1 do -- update objects
+                local obj = objects[i]
+                obj:update(dt)
+                if obj.lifetime <= 0 then
+                    table.remove(objects, i)
                 end
-                table.remove(projectiles, i)
+            end
+
+            for i = #projectiles, 1, -1 do -- update projectiles
+                local proj = projectiles[i]
+                proj:update(dt)
+                if proj.lifetime <= 0 then
+                    if proj.body then
+                        proj.body:destroy()
+                    end
+                    table.remove(projectiles, i)
+                end
+            end
+
+            world:update(dt)
+            player:update(dt)
+            player:control("space", "s", "a", "d", "lshift", 500)
+            player:OffStageRespawn()
+
+            if RoundData.ongoing then
+                RoundData.time = RoundData.time - dt
+            end                                                                                     -- round stuff
+
+            if RoundData.time <= 0 then
+            
+                RoundData.ongoing = false
+                RoundData.enemyPicker = true
+
+                RoundData.level = RoundData.level + 1
+                RoundData.starttime = RoundData.starttime + 3
+                RoundData.time = RoundData.starttime
+                RoundData.difficultyTBO = RoundData.difficultyTBO - 0.1
+                refreshChoiceButtons()
+                
+            end
+
+
+        else
+            IntroFrameDelay = IntroFrameDelay - dt
+            if IntroFrameDelay <= 0 then
+
+                IntroFrame = IntroFrame + 1
+                IntroSound:setPitch(2)
+                IntroSound:play()
+
+                IntroFrameDelay = 0.5
+
+                if IntroFrame > 5 then
+
+                    IntroPlaying = false
+                    IntroPlayedBefore = true
+                    IntroFrameDelay = 0.05
+
+                    IntroSound2:setPitch(2)
+                    IntroSound2:play()
+
+                end
+
             end
         end
-
-        world:update(dt)
-        player:update(dt)
-        player:control("space","s","a","d","lshift",500)
-        player:OffStageRespawn()
     end
-
     if menuVisible then
         menu:update()
     end
@@ -179,7 +298,7 @@ function love.quit()
     return false
 end
 
-function love.draw()
+function love.draw()--                                                                                        ----  v v v  | all drawing |  v v v  ----
 
     if not menuVisible and not settingsVisible then
 
@@ -190,7 +309,7 @@ function love.draw()
         for _, obj in ipairs(objects) do
             obj:draw()
         end
-        
+
         player:draw()
 
         local fx = floorBody:getX()-350
@@ -198,29 +317,65 @@ function love.draw()
         love.graphics.setLineStyle("smooth")
         love.graphics.setLineWidth(2)
         love.graphics.rectangle("line",fx,fy,700,125)
+
+        local ww = love.graphics.getWidth()
+        local wh = love.graphics.getHeight()
+
+        if not RoundData.enemyPicker then
+            love.graphics.printf(string.format("%.1f",RoundData.time),0,35,ww,"center")
+        end
+        love.graphics.setFont(smalltobyfont)
+        love.graphics.printf(RoundData.level,0,10,ww,"center")
     end
-    
-    -- Draw the menu if it's visible
-    if menuVisible then
+
+    if RoundData.enemyPicker and gameStarted and not IntroPlaying then                                          -------------------- drawing choice buttons
+        love.mouse.setCursor()
+        for i, btn in ipairs(ChoiceButtons) do
+
+            local designY = btn.y + math.sin(love.timer.getTime())*10
+            local btnY = designY + 50
+            local mx,my = love.mouse.getPosition()
+
+            if mx < btn.x + btn.width and mx > btn.x and my < btn.y + btn.height and my > btn.y then
+                local cur = love.mouse.getSystemCursor("hand")
+                love.mouse.setCursor(cur)
+                love.graphics.setColor(1, 0, 0,0.15)
+            else
+                love.graphics.setColor(0, 0, 0,0.5)
+
+            end
+
+            love.graphics.rectangle("fill", btn.x, designY, btn.width, btn.height)
+
+            love.graphics.setColor(1, 0, 0)
+            love.graphics.rectangle("line", btn.x, designY, btn.width, btn.height)
+            love.graphics.line(btn.x,btnY,btn.x + btn.width,btnY)
+
+            love.graphics.setFont(tobyfont)
+            love.graphics.setColor(1, 1, 1)
+            love.graphics.printf(btn.title, btn.x, designY + 5, btn.width, "center")
+
+            love.graphics.setFont(smalltobyfont)
+            love.graphics.printf(btn.desc, btn.x + 10, designY + 60, btn.width - 20, "left")
+
+        end
+    end
+
+    if menuVisible then -- drawing menu
         menu:draw()
     end
-    
-    -- Draw the settings menu if it's visible
-    if settingsVisible then
-        -- Draw a semi-transparent black background
-        love.graphics.setColor(0, 0, 0, 0.7)  -- Black with 70% opacity
+
+    if settingsVisible then                                                                                         ---------------- drawing settings menu
+        love.graphics.setColor(0, 0, 0, 0.7)
         love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
-        
-        -- Set text color to white and font
+
         love.graphics.setColor(1, 1, 1)
         love.graphics.setFont(settingsFont)
-        
-        -- Draw settings title
+
         love.graphics.print("SETTINGS", 300, 150)
-        
-        -- Draw placeholder text
+
         love.graphics.setFont(love.graphics.newFont("fonts/tiny5.ttf", 24))
-        love.graphics.print("(Settings coming soon)", 300, 250)
+        love.graphics.print("(Not yet implemented)", 300, 250)
         love.graphics.print("Press ESC to go back", 300, 320)
     end
 end
@@ -228,41 +383,45 @@ end
 -- Handle keyboard input for menu and game controls
 function love.keypressed(key)
 
-    if key == "escape" then
+    if key == "escape" and not IntroPlaying then
         if settingsVisible then
             settingsVisible = false
             menuVisible = true
         else
-            menuVisible = not menuVisible
-            gameRunning = not gameRunning
+            if gameStarted then
+                menuVisible = not menuVisible
+                gameRunning = not gameRunning
+            end
         end
         updateDiscordPresence()
         return
     end
 
-    -- Handle menu navigation (up/down) when menu is visible
     if menuVisible and not settingsVisible then
         if key == "up" or key == "w" then  
-            movemenuSound:play()
+            movemenuSound:clone():play()
             menu:selectUp()
             return
         elseif key == "down" or key == "s" then
-            movemenuSound:play()
+            movemenuSound:clone():play()
             menu:selectDown()
             return
         end
     end
 
-    -- Handle menu item selection when menu is visible
     if menuVisible and not settingsVisible and (key == "return" or key == "z") then
 
-        selectSound:play()
+        selectSound:clone():play()
         local selectedItem = menu:getSelectedItem()
 
         if selectedItem == "Start Game" or selectedItem == "Resume Game" then
+
             menuVisible = false
             gameRunning = true
             gameStarted = true
+            IntroPlaying = true
+            IntroFrame = 1
+
             menu:setGameStarted(true)
             updateDiscordPresence()
 
@@ -276,9 +435,26 @@ function love.keypressed(key)
             end
         elseif selectedItem == "StayPut Made With TurboWarp" then
             love.system.openURL("https://stayput.my.canva.site/")
-            
+
         elseif selectedItem == "Quit" then
             love.event.quit()
         end
     end
 end
+
+function love.mousepressed(mx,my,button)
+    if RoundData.enemyPicker and button == 1 then
+        for i, btn in ipairs(ChoiceButtons) do
+            if mx >= btn.x and mx <= btn.x + btn.width and my >= btn.y and my <= btn.y + btn.height then
+
+                table.insert(RoundData.enemiesActive,btn.id)
+                RoundData.enemyPicker = false
+                RoundData.ongoing = true
+
+                break
+            end
+        end
+    end
+end
+
+-- TODO: Add enemy spawning and improve timer UI.

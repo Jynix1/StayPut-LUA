@@ -18,13 +18,16 @@ function Player.new(world, x, y)
     instance.maxHP = 4
     instance.hpBar = 100
     instance.hpBarMax = 100
-    instance.invulnTimer = 0        -- seconds left of i-frames
-    instance.invulnDuration = 3 
+    instance.invulnTimer = 0
+    instance.invulnDuration = 3
     instance.backupinvulnduration = 0.05
     instance.backupinvulntimer = 0
     instance.damageParticleDelay = 0
     instance.damageParticleDelayDuration = 1/60
     instance.hpRefill = 0
+    instance.healQueue = 0
+    instance.healTime = 0
+    instance.healTicker = 0
 
     instance.body = love.physics.newBody(world, x, y, "dynamic")
     instance.shape = love.physics.newCircleShape(25)
@@ -48,6 +51,8 @@ function Player.new(world, x, y)
     instance.dashcooldown = 0
     instance.hurtShakeTime = 0
     instance.hurtShakeAmount = 6
+    instance.emitD = 0
+
     -- particles
     local pCanvas = love.graphics.newCanvas(8, 8)
     pCanvas:renderTo(function()
@@ -60,10 +65,10 @@ function Player.new(world, x, y)
     instance.pSystem:setParticleLifetime(0.4, 0.8) 
     instance.pSystem:setEmissionRate(0)
     instance.pSystem:setSpeed(40,100)              
-    
+
     instance.pSystem:setSpread(math.pi * 2)        
     instance.pSystem:setLinearAcceleration(0, 50)  
-    
+
     instance.pSystem:setColors(1, 1, 1, 0.6, 1, 1, 1, 0)
     instance.pSystem:setSizes(1, 0.5, 0)
 
@@ -109,11 +114,14 @@ function Player.new(world, x, y)
     instance.starbouncePSystem:setSizes(2.2, 1.4, 0)
     instance.starbouncePSystem:setColors(1, 1, 0.4, 0.9, 1, 1, 0.2, 0)
 
+    for i = 1, 5 do
+        IntroFrames[i] = love.graphics.newImage("sprites/mspawn/mspawn" .. i .. ".png")
+    end
+
     return instance
 end
 
--- render player
-function Player:draw()--------------------------------------------------------------------------------------------------------- DRAW function
+function Player:draw()--------------------------------------------------------------------------------------------------------- drawing function
 
     local alpha = 1
     if self.invulnTimer and self.invulnTimer > 0 then
@@ -124,16 +132,21 @@ function Player:draw()----------------------------------------------------------
     love.graphics.draw(self.pSystem, 0, 0)
     love.graphics.draw(self.damagePSystem, 0, 0)
     love.graphics.draw(self.starbouncePSystem, 0, 0)
-    if self.hp == 4 then
-        self.currentImage = self.imagemint4
-    elseif self.hp == 3 then
-        self.currentImage = self.imagemint3
-    elseif self.hp == 2 then
-        self.currentImage = self.imagemint2
-    elseif self.hp == 1 then
-        self.currentImage = self.imagemint1
-    elseif self.hp <= 0 then
-        self.currentImage = self.imagemint0
+
+    if not IntroPlaying then
+        if self.hp == 4 then
+            self.currentImage = self.imagemint4
+        elseif self.hp == 3 then
+            self.currentImage = self.imagemint3
+        elseif self.hp == 2 then
+            self.currentImage = self.imagemint2
+        elseif self.hp == 1 then
+            self.currentImage = self.imagemint1
+        elseif self.hp <= 0 then
+            self.currentImage = self.imagemint0
+        end
+    else
+        self.currentImage = IntroFrames[IntroFrame]
     end
 
     local px = self.body:getX()
@@ -160,7 +173,6 @@ function Player:draw()----------------------------------------------------------
 
     love.graphics.setColor(1, 1, 1, 1)
 
-    -- debug ray visualization
     if debugRayEnabled then
         for _, r in ipairs(debugRays) do
             local age = love.timer.getTime() - r.t
@@ -215,7 +227,7 @@ function Player:jump()
         self.body:setLinearVelocity(vx, -600)
         self.canJump = false
 
-        self.pSystem:setPosition(cx, cy)
+        self.pSystem:setPosition(cx+20, cy-20)
         self.pSystem:emit(30)
     end
 end
@@ -385,6 +397,21 @@ function Player:control(up, down, left, right, dash, force)                     
     end
 end
 
+function Player:Heal(H)
+    self.hp = self.hp + H
+end
+
+function Player:QueueHeal(H,giveInvuln,recoverBar,delay)
+    if delay == 0 then
+        self:heal(H)
+    else
+        self.healQueue = self.healqueue + H
+        self.healTime = delay
+        self.barHealQueue = self.barHealQueue + recoverBar
+    end
+    self.invulnTimer = giveInvuln
+end
+
 function Player:update(dt)                                                     --------------------------------------------------- Player Update
 
     if self.dashcooldown > 0 then
@@ -417,7 +444,6 @@ function Player:update(dt)                                                     -
     self.damagePSystem:update(dt)
     self.starbouncePSystem:update(dt)
 
-    -- prune debug rays
     local now = love.timer.getTime()
     for i = #debugRays, 1, -1 do
         if now - debugRays[i].t > debugRays[i].ttl then
@@ -431,8 +457,12 @@ function Player:update(dt)                                                     -
     local speed = math.sqrt(vx * vx + vy * vy)
 
     if speed > 200 then
-        self.pSystem:setPosition(px, py)
-        self.pSystem:emit(1)
+        if self.emitD <= 0 then
+            self.pSystem:setPosition(px, py)
+            self.pSystem:emit(1)
+            self.emitD = 0.05
+        end
+        self.emitD = self.emitD - dt
     end
 
     if self.hpBar < 100 then

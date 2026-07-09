@@ -34,7 +34,7 @@ EnemyOptions =
 local ChoiceButtons = {
     { x = 115, y = 100, width = 240, height = 200, id = "", title = "", desc = "" },
     { x = 413, y = 100, width = 240, height = 200, id = "", title = "", desc = "" },
-    { x = 711, y = 100, width = 240, height = 200, id = "", title = "", desc = "" }
+    { x = 711, y = 100, width = 240, height = 200, id = "", title = "", desc = "" },
 }
 
 local function refreshChoiceButtons()
@@ -55,14 +55,26 @@ local function refreshChoiceButtons()
 
     end
     
+    if #pool == 0 then
+        RoundData.enemyPicker = false
+        RoundData.ongoing = true
+        return
+    end
+
     for i = 1, 3 do
-        if #pool == 0 then break end
+        if #pool > 0 then
         local randomIndex = love.math.random(1,#pool)
         local chosenEnemy = table.remove(pool, randomIndex)
 
         ChoiceButtons[i].id = chosenEnemy.id
         ChoiceButtons[i].title = chosenEnemy.title
         ChoiceButtons[i].desc = chosenEnemy.desc
+        else
+            ChoiceButtons[i].id = nil -- Placeholder ID
+            ChoiceButtons[i].title = "No Option"
+            ChoiceButtons[i].desc = ""
+        end
+        
     end
 end
 
@@ -245,7 +257,30 @@ function love.update(dt)--                                                      
 
             if RoundData.ongoing then
                 RoundData.time = RoundData.time - dt
-            end                                                                                     -- round stuff
+                RoundData.spawnTimer = RoundData.spawnTimer - dt
+
+                if RoundData.spawnTimer <= 0 then
+                    if #RoundData.enemiesActive > 0 then
+
+                        local random = love.math.random(1, #RoundData.enemiesActive)
+                        local enemyIdToSpawn = RoundData.enemiesActive[random]
+
+                        local spawnX = love.math.random(200, 866) 
+
+                        local enemyCD = 0
+                        for _, option in ipairs(EnemyOptions) do
+                            if option.id == enemyIdToSpawn then
+                                enemyCD = option.cd or 0
+                            end
+                        end
+
+                        local newEnemy = object:new(spawnX, -50, enemyIdToSpawn)
+                        table.insert(objects, newEnemy)
+                        RoundData.spawnTimer = RoundData.difficultyTBO + enemyCD
+
+                    end
+                end
+            end                                                                                     -- round stuff --
 
             if RoundData.time <= 0 then
             
@@ -397,6 +432,10 @@ function love.keypressed(key)
         return
     end
 
+    if key == "backspace" then
+        RoundData.time = 0
+    end
+
     if menuVisible and not settingsVisible then
         if key == "up" or key == "w" then  
             movemenuSound:clone():play()
@@ -447,11 +486,12 @@ function love.mousepressed(mx,my,button)
         for i, btn in ipairs(ChoiceButtons) do
             if mx >= btn.x and mx <= btn.x + btn.width and my >= btn.y and my <= btn.y + btn.height then
 
-                table.insert(RoundData.enemiesActive,btn.id)
-                RoundData.enemyPicker = false
-                RoundData.ongoing = true
-
-                break
+                if btn.id ~= nil then
+                    table.insert(RoundData.enemiesActive,btn.id)
+                    RoundData.enemyPicker = false
+                    RoundData.ongoing = true
+                    break
+                end
             end
         end
     end

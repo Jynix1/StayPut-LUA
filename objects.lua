@@ -180,11 +180,17 @@ function object:update(dt)
                 return true
             end)
 
-            -- emit at PS-local origin (0,0). draw() will place the PS at the bomb coordinates
             self.exParticleSystem:setPosition(0, 0)
             self.exParticleSystem:emit(100)
-            local numProjectiles = 12
-            local spawnDistance = 5  -- How far from bomb center to spawn
+
+            local numProjectiles = 14
+            if math.ceil(14-RoundData.level/2) < 5 then
+                numProjectiles = 5
+            else
+                numProjectiles = math.ceil(14-RoundData.level/2)
+            end
+
+            local spawnDistance = 5
 
             for i = 0, numProjectiles - 1 do
                 local angle = (i / numProjectiles) * math.pi * 2

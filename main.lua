@@ -7,6 +7,8 @@ if os.getenv("LOVE2D_TOOLS") then pcall(require, "_love2d_tools_bridge") end
 local Player = require("baller")
 local object = require("objects")
 
+local discordrefreshTimer = 0
+
 RoundData =
 {
 
@@ -115,14 +117,13 @@ local function updateDiscordPresence()
     if menuVisible then
         setDiscordPresence("In the menu")
     elseif gameRunning then
-        setDiscordPresence("Playing StayPut, "..player.hp.." Hits left.")
+        setDiscordPresence("Playing StayPut, "..player.hp.." Hits left, on level "..RoundData.level)
     else
         setDiscordPresence("Paused", "Taking a break")
     end
 end
 
 function love.load()
-    -- Set pixel-perfect filtering (no blur on scaled images)
     love.graphics.setDefaultFilter("nearest", "nearest")
     
     love.physics.setMeter(64)
@@ -142,6 +143,8 @@ function love.load()
     IntroSound2 = love.audio.newSource("sounds/sfx/select.mp3", "static")
     selectSound = love.audio.newSource("sounds/sfx/select.mp3", "static")
     equipSound = love.audio.newSource("sounds/sfx/equip.mp3", "static")
+    barRecoverSound = love.audio.newSource("sounds/sfx/barheal.mp3","static")
+    barRecoverSound:setPitch(1.2)
 
     menuVisible = true
     gameRunning = false
@@ -200,6 +203,7 @@ function love.update(dt)--                                                      
 
     if discordEnabled then
         discordRPC.runCallbacks()
+        passivediscordupdate(dt)
     end
 
     for key, objType in pairs(spawnKeyConfig) do  --------------------------------------------  place holder dev key
@@ -283,7 +287,7 @@ function love.update(dt)--                                                      
             end                                                                                     -- round stuff --
 
             if RoundData.time <= 0 then
-            
+                
                 RoundData.ongoing = false
                 RoundData.enemyPicker = true
 
@@ -292,7 +296,13 @@ function love.update(dt)--                                                      
                 RoundData.time = RoundData.starttime
                 RoundData.difficultyTBO = RoundData.difficultyTBO - 0.1
                 refreshChoiceButtons()
-                
+                updateDiscordPresence()
+
+                player:QueueHeal(2,4,50)
+                if player.hpBar < 100 then
+                    barRecoverSound:play()
+                end
+
             end
 
 
@@ -494,6 +504,14 @@ function love.mousepressed(mx,my,button)
                 end
             end
         end
+    end
+end
+
+function passivediscordupdate(dt)
+    discordrefreshTimer = discordrefreshTimer - dt
+    if discordrefreshTimer <= 0 then
+        discordrefreshTimer = 7
+        updateDiscordPresence()
     end
 end
 

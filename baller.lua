@@ -24,10 +24,12 @@ function Player.new(world, x, y)
     instance.backupinvulntimer = 0
     instance.damageParticleDelay = 0
     instance.damageParticleDelayDuration = 1/60
+
     instance.hpRefill = 0
     instance.healQueue = 0
+    instance.barHealQueue = 0
     instance.healTime = 0
-    instance.healTicker = 0
+    instance.barHealTime = 0
 
     instance.body = love.physics.newBody(world, x, y, "dynamic")
     instance.shape = love.physics.newCircleShape(25)
@@ -46,14 +48,15 @@ function Player.new(world, x, y)
     instance.imagemint4 = love.graphics.newImage("sprites/mint/mint4.png")
     instance.currentImage = nil
 
+    instance.sfx_power = love.audio.newSource("sounds/sfx/power.mp3","static")
+
     instance.canJump = true
     instance.dashcolor = false
     instance.dashcooldown = 0
     instance.hurtShakeTime = 0
-    instance.hurtShakeAmount = 6
+    instance.hurtShakeAmount = 12
     instance.emitD = 0
 
-    -- particles
     local pCanvas = love.graphics.newCanvas(8, 8)
     pCanvas:renderTo(function()
         love.graphics.setColor(1, 1, 1)
@@ -82,10 +85,10 @@ function Player.new(world, x, y)
     instance.damagePSystem = love.graphics.newParticleSystem(triCanvas, 80)
     instance.damagePSystem:setParticleLifetime(0.5, 1.0)
     instance.damagePSystem:setEmissionRate(0)
-    instance.damagePSystem:setSpeed(200, 325)
+    instance.damagePSystem:setSpeed(250, 500)
     instance.damagePSystem:setSpread(math.pi * 2)
-    instance.damagePSystem:setLinearDamping(2, 4)
-    instance.damagePSystem:setSizes(1.2, 0.4, 0)
+    instance.damagePSystem:setLinearDamping(1,3)
+    instance.damagePSystem:setSizes(3, 0.8, 0)
     instance.damagePSystem:setColors(1, 0.4, 0.4, 0.9, 1, 0.2, 0.2, 0)
 
     local starbounceCanvas = love.graphics.newCanvas(24, 24)
@@ -200,20 +203,38 @@ end
 function Player:jump()
     local cx = self.body:getX() - 20
     local cy = self.body:getY()
-    local targetY = cy + 40
+    local targetY = cy + 35
     local standingOnGround = false
 
     for i = 1, 5 do
         local newX = cx + (i - 1) * 10
 
-        -- draw tentative ray (will be overwritten with hit info if any)
         addDebugRay(newX, cy, newX, targetY, nil, nil, nil, nil, 0.12)
 
         world:rayCast(newX, cy, newX, targetY, function(fixture, x, y, xn, yn, fraction)
-            -- ignore player's own fixture and any sensor fixtures (projectiles, etc.)
+
+            if fixture == floorFixture then
+                standingOnGround = true
+                addDebugRay(newX, cy, newX, targetY, x, y, xn, yn, 1.2)
+                return 0
+            end
+
+            return 1
+        end)
+    end
+
+    targetY = cy + 30
+    cx = self.body:getX() - 10
+
+    for i = 1, 5 do
+        local newX = cx + (i - 1) * 5
+
+        addDebugRay(newX, cy, newX, targetY, nil, nil, nil, nil, 0.12)
+
+        world:rayCast(newX, cy, newX, targetY, function(fixture, x, y, xn, yn, fraction)
+
             if fixture ~= self.fixture and not fixture:isSensor() then
                 standingOnGround = true
-                -- record hit for visualization
                 addDebugRay(newX, cy, newX, targetY, x, y, xn, yn, 1.2)
                 return 0
             end
@@ -313,10 +334,12 @@ function Player:OffStageRespawn()
 end
 
 function Player:TakeDamage(amount)
+
     if self.invulnTimer and self.invulnTimer > 0 then
         return
     end
 
+    self.hpRefill = 3
     self.hp = self.hp - 1
     self.invulnTimer = self.invulnDuration
     self.damageParticleDelay = self.damageParticleDelayDuration
@@ -339,6 +362,7 @@ function Player:takeBarDamage(amount)
     self.hpBar = math.max(0, self.hpBar - amount)
     self.backupinvulntimer = self.backupinvulnduration
     self.hurtShakeTime = 0.12
+    self.hpRefill = 2
 
     if self.hpBar <= 0 then
 
@@ -371,8 +395,8 @@ function Player:control(up, down, left, right, dash, force)                     
     end
 
     if love.keyboard.isDown(up) and self.canJump then
-        self:jump()
         self:wallbounce()
+        self:jump()
     end
 
     if love.keyboard.isDown(down) then
@@ -397,19 +421,24 @@ function Player:control(up, down, left, right, dash, force)                     
     end
 end
 
-function Player:Heal(H)
-    self.hp = self.hp + H
+function Player:Heal(H,B)
+
+    if H > 0 and self.hp < 4 then
+        self.sfx_power:clone():play()    
+    end
+
+    self.hp = math.min(4,math.max(0,self.hp + H))
+    self.hpBar = math.min(100,math.max(0,self.hpBar + B))
+
 end
 
-function Player:QueueHeal(H,giveInvuln,recoverBar,delay)
-    if delay == 0 then
-        self:heal(H)
-    else
-        self.healQueue = self.healqueue + H
-        self.healTime = delay
-        self.barHealQueue = self.barHealQueue + recoverBar
-    end
+function Player:QueueHeal(H,giveInvuln,recoverBar)
+
+    self.healQueue = self.healQueue + H
+    self.barHealQueue = self.barHealQueue + recoverBar
+
     self.invulnTimer = giveInvuln
+
 end
 
 function Player:update(dt)                                                     --------------------------------------------------- Player Update
@@ -424,6 +453,24 @@ function Player:update(dt)                                                     -
 
     if self.backupinvulntimer > 0 then
         self.backupinvulntimer = math.max(0, self.backupinvulntimer - dt)
+    end
+
+    if self.healQueue > 0 then
+        self.healTime = self.healTime - dt
+        if self.healTime <= 0 then
+            self.healTime = 1
+            self:Heal(1,0)
+            self.healQueue = self.healQueue - 1
+        end
+    end
+
+    if self.barHealQueue > 0 then
+        self.barHealTime = self.barHealTime - dt
+        if self.barHealTime <= 0 then
+            self.barHealTime = 0.04
+            self:Heal(0,1)
+            self.barHealQueue = self.barHealQueue - 1
+        end
     end
 
     if self.damageParticleDelay and self.damageParticleDelay > 0 then
@@ -465,7 +512,7 @@ function Player:update(dt)                                                     -
         self.emitD = self.emitD - dt
     end
 
-    if self.hpBar < 100 then
+    if self.hpBar < 100 and RoundData.ongoing then
        self.hpRefill = self.hpRefill + dt
        if self.hpRefill >= 1.5 then
            self.hpBar = math.min(self.hpBarMax, self.hpBar + 1)
@@ -478,8 +525,9 @@ function Player:HPbarDraw()
     local hpBar = self.hpBar or 100
     local hpBarMax = self.hpBarMax or 100
     local pct = math.max(0, math.min(1, hpBar / hpBarMax))
+    local i_frame_pct = math.max(0, math.min(1,(self.invulnTimer)/4))
 
-    local barX, barY, barW, barH = 25, 60, 200, 18
+    local barX, barY, barW, barH = 25, 60, 175, 12
     local fillW = math.max(0, pct * barW)
 
     local shakeTime = self.hurtShakeTime or 0
@@ -497,24 +545,40 @@ function Player:HPbarDraw()
     love.graphics.setColor(0, 0, 0, 0.6)
     love.graphics.rectangle("fill", barX - 2, barY - 2, barW + 4, barH + 4)
 
-    love.graphics.setColor(1, 0.2 * (1 - pct), 0.2)
+    if self.invulnTimer and self.invulnTimer > 0 then
+        love.graphics.setColor(0.855, 1, 0.851)
+    else
+        if self.hpBar < 30 then
+            love.graphics.setColor(1,0,0,1)
+        else
+            love.graphics.setColor(1,1,1,1)
+        end
+    end
     love.graphics.rectangle("fill", barX, barY, fillW, barH)
 
-    if self.invulnTimer and self.invulnTimer > 0 then
-        love.graphics.setColor(0, 0.882, 1)
-    else
-        love.graphics.setColor(1, 1, 1, 1)
-    end
+    love.graphics.setColor(1, 1, 1, 1)
     love.graphics.rectangle("line", barX, barY, barW, barH)
 
-    local font = love.graphics.newFont("fonts/tiny5.ttf", 30)
+
+    if self.invulnTimer > 0 then
+        love.graphics.setColor(0, 0.718, 1)
+        local currentW = barW * i_frame_pct
+        -- Top line
+        love.graphics.line(barX, barY, barX + currentW, barY)
+        -- Bottom line
+        love.graphics.line(barX, barY + barH, barX + currentW, barY + barH)
+        -- Left tiny line
+        love.graphics.line(barX, barY-1, barX, barY + barH+2)
+    end
+
+    local font = love.graphics.newFont("fonts/tiny5.ttf", 24)
     love.graphics.setFont(font)
-    
+
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.print(tostring(math.floor(hpBar)) .. "%", barX + barW + 12, barY - 8)
 
 
-    font = love.graphics.newFont("fonts/tiny5.ttf", 36)
+    font = love.graphics.newFont("fonts/tiny5.ttf", 40)
     love.graphics.setFont(font)
 
     love.graphics.print("HP: " .. (self.hp or 0) .. "/" .. (self.maxHP or 4), 35, 10)

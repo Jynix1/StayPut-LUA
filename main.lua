@@ -88,6 +88,7 @@ local spawnKeyConfig = {                           --
     ["1"] = "square",
     ["2"] = "follower",
     ["3"] = "bomb",
+    ["4"] = "tripwire"
 }                                                  --
 
 local Menu = require("menu")

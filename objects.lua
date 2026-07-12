@@ -12,7 +12,7 @@ function object:new(x, y, obj)
 
     local exCanvas = love.graphics.newCanvas(70, 70)
     exCanvas:renderTo(function()
-        love.graphics.clear(0,0,0,0)
+        love.graphics.clear(0, 0, 0, 0)
         love.graphics.setColor(1, 1, 1)
         love.graphics.circle("fill", 35, 35, 35)
     end)
@@ -34,7 +34,6 @@ function object:new(x, y, obj)
 
         instance.newBody:setLinearDamping(0.5)
         instance.newBody:setAngularDamping(0.5)
-
     end
 
     if obj == "follower" then
@@ -46,7 +45,6 @@ function object:new(x, y, obj)
 
         instance.newBody:setLinearDamping(1)
         instance.newBody:setAngularDamping(2)
-
     end
 
     if obj == "bomb" then
@@ -56,17 +54,49 @@ function object:new(x, y, obj)
         instance.shape = love.physics.newCircleShape(40)
         instance.fixture = love.physics.newFixture(instance.newBody, instance.shape, 1)
         instance.newBody:setGravityScale(0.5) -- Reduce gravity effect on the bomb
-        instance.fixture:setRestitution(0.8) -- Make it bouncy
+        instance.fixture:setRestitution(0.8)  -- Make it bouncy
 
-        instance.fusetime = 3 -- seconds until explosion
-        instance.timeAfterExplosion = 2 -- seconds after explosion before removal
+        instance.fusetime = 3                 -- seconds until explosion
+        instance.timeAfterExplosion = 2       -- seconds after explosion before removal
         instance.exploded = false
         instance.lastX = 0
         instance.lastY = 0
 
         instance.newBody:setLinearDamping(1)
         instance.newBody:setAngularDamping(2)
+    end
 
+    if obj == "tripwire" then
+        instance.lifetime = 10
+
+        instance.newBody = love.physics.newBody(world, x, y, "dynamic")
+        instance.shape = love.physics.newRectangleShape(60,60)
+        instance.fixture = love.physics.newFixture(instance.newBody, instance.shape, 1.35)
+
+        instance.fixture:setRestitution(0.8)
+        instance.newBody:setAngle(math.pi / 4)
+        instance.newBody:setFixedRotation(true)
+        instance.newBody:setGravityScale(0.75)
+
+        instance.checkTime = 2
+        instance.RequiredStillTime = 0.7
+        instance.StillTimer = 0
+        instance.delay = 0.75
+
+        local ticksnd =love.audio.newSource("sounds/sfx/tripwire/tick.mp3","static")
+        ticksnd:setPitch(2)
+        instance.TickSound = ticksnd
+        instance.TickInterval = 0.3
+
+        instance.ClearSound = love.audio.newSource("sounds/sfx/tripwire/clear.mp3","static")
+        instance.DangerSound = love.audio.newSource("sounds/sfx/tripwire/danger.mp3","static")
+        instance.DangerSound:setPitch(2)
+        instance.FailSound = love.audio.newSource("sounds/sfx/tripwire/fail.mp3","static")
+        instance.AppearSound = love.audio.newSource("sounds/sfx/tripwire/appear.mp3","static")
+
+        instance.newBody:setLinearDamping(2)
+
+        instance.AppearSound:clone():play()
     end
 
     instance.fixture:setUserData({ type = instance.obj, owner = instance })
@@ -79,8 +109,7 @@ function object:draw() ----------------                                         
         return
     end
 
-    -- draw particle system centered on the 150x150 canvas at the body's position
-    love.graphics.draw(self.exParticleSystem, self.lastX, self.lastY, 0, 1, 1, 0,0)
+    love.graphics.draw(self.exParticleSystem, self.lastX, self.lastY, 0, 1, 1, 0, 0)
 
     local alpha = 1
     if self.lifetime and self.lifetime < 2 then
@@ -94,7 +123,7 @@ function object:draw() ----------------                                         
         love.graphics.polygon("line", self.newBody:getWorldPoints(self.shape:getPoints()))
         love.graphics.setColor(1, 1, 1, 1)
     elseif self.obj == "follower" then
-        love.graphics.setColor(0.8, 0.8, 1, alpha)
+        love.graphics.setColor(1, 1, 1, alpha)
         love.graphics.setLineStyle("smooth")
         love.graphics.setLineWidth(8)
         love.graphics.circle("line", self.newBody:getX(), self.newBody:getY(), self.shape:getRadius())
@@ -127,11 +156,17 @@ function object:draw() ----------------                                         
             end
             love.graphics.setColor(1, 1, 1, 1)
         end
+    elseif self.obj == "tripwire" then
+        love.graphics.setColor(1, 1, 1, alpha)
+        love.graphics.setLineStyle("smooth")
+        love.graphics.setLineWidth(4)
+        love.graphics.polygon("line", self.newBody:getWorldPoints(self.shape:getPoints()))
+        love.graphics.setColor(1, 1, 1, 1)
     end
 end
 
 function object:update(dt)
-    if not self.newBody or not self.shape then
+    if not self.newBody or self.newBody:isDestroyed() or not self.shape then
         return
     end
 
@@ -157,7 +192,7 @@ function object:update(dt)
     end
 
     self.exParticleSystem:update(dt)
-
+    --
     if self.obj == "bomb" then
         self.fusetime = self.fusetime - dt
         if self.fusetime <= 0 and not self.exploded then
@@ -184,10 +219,10 @@ function object:update(dt)
             self.exParticleSystem:emit(100)
 
             local numProjectiles = 14
-            if math.ceil(14-RoundData.level/2) < 5 then
+            if math.ceil(14 - RoundData.level / 2) < 5 then
                 numProjectiles = 5
             else
-                numProjectiles = math.ceil(14-RoundData.level/2)
+                numProjectiles = math.ceil(14 - RoundData.level / 2)
             end
 
             local spawnDistance = 5
@@ -199,10 +234,9 @@ function object:update(dt)
                 local newProjectile = Projectile.new(world, spawnX, spawnY, angle, "bullet")
                 table.insert(projectiles, newProjectile)
             end
-            
         end
     end
-
+    --
     if self.obj == "follower" then
         local playerX, playerY = player.body:getPosition()
         local followerX, followerY = self.newBody:getPosition()
@@ -251,6 +285,57 @@ function object:update(dt)
                 self.jumpCooldown = nil
             end
         end
+    end
+
+    if self.obj == "tripwire" then
+        local cx, cy = self.newBody:getPosition()
+        
+        if self.delay < 0 then
+            if not player.moving then self.StillTimer = self.StillTimer + dt end
+            if player.moving then self.checkTime = self.checkTime - dt self.StillTimer = 0 end
+        else
+           self.delay = self.delay - dt
+        end
+
+        if cy > 200 then
+            self.newBody:applyLinearImpulse(0, -8)
+        end
+
+        if self.checkTime <= 0 then
+            player:TakeDamage(1)
+            self.newBody:destroy()
+            self.newBody = nil
+            self.shape = nil
+            self.fixture = nil
+            self.FailSound:clone():play()
+            return
+        end
+
+        if self.StillTimer > self.RequiredStillTime then
+            self.ClearSound:clone():play()
+            self.newBody:destroy()
+            self.newBody = nil
+            self.shape = nil
+            self.fixture = nil
+            return
+        end
+
+        self.TickInterval = self.TickInterval - dt
+
+        if self.TickInterval <= 0 then
+            if self.checkTime > 1 then
+                self.TickSound:clone():play()
+                self.TickInterval = 0.1
+            else
+                self.DangerSound:clone():play()
+                self.TickInterval = 0.2
+            end
+            
+        end
+
+        print("1 "..tostring( player.moving))
+        print("2 ".. self.StillTimer)
+        print("3 ".. self.checkTime)
     end
 end
 

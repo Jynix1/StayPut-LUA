@@ -57,6 +57,8 @@ function Player.new(world, x, y)
     instance.hurtShakeAmount = 12
     instance.emitD = 0
 
+    instance.moving = false
+
     local pCanvas = love.graphics.newCanvas(8, 8)
     pCanvas:renderTo(function()
         love.graphics.setColor(1, 1, 1)
@@ -373,7 +375,13 @@ function Player:takeBarDamage(amount)
     end
 end
 
-function Player:control(up, down, left, right, dash, force)                         -------------------------------------------- player control
+function Player:control(up, down, left, right, dash, force)                        -------------------------------------------- player control
+
+    if love.keyboard.isDown(up) or love.keyboard.isDown(down) or love.keyboard.isDown(left) or love.keyboard.isDown(right) or love.keyboard.isDown(dash) then
+        self.moving = true
+    else
+        self.moving = false
+    end
 
     function love.keyreleased(key)
         if key == up then

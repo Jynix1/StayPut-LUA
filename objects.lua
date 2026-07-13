@@ -330,7 +330,6 @@ function object:update(dt)
                 self.DangerSound:clone():play()
                 self.TickInterval = 0.2
             end
-            
         end
 
         print("1 "..tostring( player.moving))

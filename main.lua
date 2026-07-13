@@ -279,7 +279,7 @@ function love.update(dt)--                                                      
                             end
                         end
 
-                        local newEnemy = object:new(spawnX, -50, enemyIdToSpawn)
+                        local newEnemy = object:new(spawnX, -100, enemyIdToSpawn)
                         table.insert(objects, newEnemy)
                         RoundData.spawnTimer = RoundData.difficultyTBO + enemyCD
 

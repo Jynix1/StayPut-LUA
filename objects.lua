@@ -30,7 +30,7 @@ function object:new(x, y, obj)
 
         instance.newBody = love.physics.newBody(world, x, y, "dynamic")
         instance.shape = love.physics.newRectangleShape(150, 150)
-        instance.fixture = love.physics.newFixture(instance.newBody, instance.shape, 2)
+        instance.fixture = love.physics.newFixture(instance.newBody, instance.shape, 1.75)
 
         instance.newBody:setLinearDamping(0.5)
         instance.newBody:setAngularDamping(0.5)
@@ -70,33 +70,66 @@ function object:new(x, y, obj)
         instance.lifetime = 10
 
         instance.newBody = love.physics.newBody(world, x, y, "dynamic")
-        instance.shape = love.physics.newRectangleShape(60,60)
+        instance.shape = love.physics.newRectangleShape(60, 60)
         instance.fixture = love.physics.newFixture(instance.newBody, instance.shape, 1.35)
 
         instance.fixture:setRestitution(0.8)
         instance.newBody:setAngle(math.pi / 4)
         instance.newBody:setFixedRotation(true)
         instance.newBody:setGravityScale(0.75)
+        instance.newBody:setLinearDamping(2)
 
         instance.checkTime = 2
-        instance.RequiredStillTime = 0.7
+        instance.RequiredStillTime = 0.5
         instance.StillTimer = 0
         instance.delay = 0.75
 
-        local ticksnd =love.audio.newSource("sounds/sfx/tripwire/tick.mp3","static")
+        local ticksnd = love.audio.newSource("sounds/sfx/tripwire/tick.mp3", "static")
         ticksnd:setPitch(2)
         instance.TickSound = ticksnd
         instance.TickInterval = 0.3
 
-        instance.ClearSound = love.audio.newSource("sounds/sfx/tripwire/clear.mp3","static")
-        instance.DangerSound = love.audio.newSource("sounds/sfx/tripwire/danger.mp3","static")
+        instance.ClearSound = love.audio.newSource("sounds/sfx/tripwire/clear.mp3", "static")
+        instance.DangerSound = love.audio.newSource("sounds/sfx/tripwire/danger.mp3", "static")
         instance.DangerSound:setPitch(2)
-        instance.FailSound = love.audio.newSource("sounds/sfx/tripwire/fail.mp3","static")
-        instance.AppearSound = love.audio.newSource("sounds/sfx/tripwire/appear.mp3","static")
+        instance.FailSound = love.audio.newSource("sounds/sfx/tripwire/fail.mp3", "static")
+        instance.AppearSound = love.audio.newSource("sounds/sfx/tripwire/appear.mp3", "static")
 
-        instance.newBody:setLinearDamping(2)
+
 
         instance.AppearSound:clone():play()
+    end
+
+    if obj == "zip" then
+        instance.lifetime = math.max(4,3 * RoundData.difficultyTBO)
+
+        instance.newBody = love.physics.newBody(world, x, y, "dynamic")
+        instance.shape = love.physics.newRectangleShape(70, 70)
+        instance.fixture = love.physics.newFixture(instance.newBody, instance.shape, 1.4)
+
+        instance.texture = love.graphics.newImage("sprites/zip.png")
+
+        instance.fixture:setRestitution(1)
+        instance.newBody:setFixedRotation(true)
+        instance.newBody:setGravityScale(0.1)
+        instance.newBody:setLinearDamping(3)
+
+        instance.spinVelocity = 0
+        instance.dashTime = 1
+        instance.dashTimer = 1
+
+        instance.dashDelay = 1
+        instance.dashDelayTimer = 1
+        instance.dashWait = 0.1
+
+        instance.dashAmount = 8
+        instance.dashCount = 8
+
+        instance.px    = nil
+        instance.py    = nil
+        instance.playx = nil
+        instance.playy = nil
+        instance.angle = nil
     end
 
     instance.fixture:setUserData({ type = instance.obj, owner = instance })
@@ -161,7 +194,20 @@ function object:draw() ----------------                                         
         love.graphics.setLineStyle("smooth")
         love.graphics.setLineWidth(4)
         love.graphics.polygon("line", self.newBody:getWorldPoints(self.shape:getPoints()))
-        love.graphics.setColor(1, 1, 1, 1)
+    elseif self.obj == "zip" then                                                                                       ---------------------------------------- fix image drawing offset
+        local vx,vy = self.newBody:getLinearVelocity()
+        local spd   = math.sqrt(vx ^ 2 + vy ^ 2)
+        local px,py = self.newBody:getPosition()
+        local tW,tY = self.texture:getDimensions()
+        local sX    = 35 / tW + spd/15000
+        local sY    = 35 / tY + spd/15000
+
+        love.graphics.setColor(1, 1, 1 - spd / 1000, alpha)
+        love.graphics.setLineStyle("rough")
+        love.graphics.setLineWidth(7)
+        love.graphics.polygon("line", self.newBody:getWorldPoints(self.shape:getPoints()))
+
+        love.graphics.draw(self.texture,px,py,0,sX,sY,300,300)
     end
 end
 
@@ -289,12 +335,15 @@ function object:update(dt)
 
     if self.obj == "tripwire" then
         local cx, cy = self.newBody:getPosition()
-        
+
         if self.delay < 0 then
             if not player.moving then self.StillTimer = self.StillTimer + dt end
-            if player.moving then self.checkTime = self.checkTime - dt self.StillTimer = 0 end
+            if player.moving then
+                self.checkTime = self.checkTime - dt
+                self.StillTimer = 0
+            end
         else
-           self.delay = self.delay - dt
+            self.delay = self.delay - dt
         end
 
         if cy > 200 then
@@ -332,9 +381,71 @@ function object:update(dt)
             end
         end
 
-        print("1 "..tostring( player.moving))
-        print("2 ".. self.StillTimer)
-        print("3 ".. self.checkTime)
+        print("1 " .. tostring(player.moving))
+        print("2 " .. self.StillTimer)
+        print("3 " .. self.checkTime)
+    end
+
+    if self.obj == "zip" then
+
+        local px,py = self.newBody:getPosition()
+
+        self.newBody:setAngle(self.newBody:getAngle() + self.spinVelocity)
+
+        local function IsTouchingAnything(body)
+            local contacts = body:getContacts()
+            return #contacts > 0
+        end
+
+        if py > 475 then 
+            self.newBody:applyLinearImpulse(0,-50)
+        end
+        if py < 0 + 60 then 
+            self.newBody:applyLinearImpulse(0,15)
+        end
+        if px > 1066 - 60 then
+            self.newBody:applyLinearImpulse(-15,0)
+        end
+        if px < 0 + 60 then
+            self.newBody:applyLinearImpulse(15,0)
+        end
+
+        if not IsTouchingAnything(self.newBody) then
+            self.spinVelocity = math.min(0.05, self.spinVelocity + 0.0002)
+        else
+            self.spinVelocity = math.max(0, math.min(0.2, self.spinVelocity - 0.00015))
+        end
+
+        if self.dashDelayTimer <= 0 then
+            if self.dashCount > 0 then
+                if self.dashWait <= 0 then
+
+                    if self.dashCount == self.dashAmount or self.angle == nil then
+                        local pyx,pyy = player.body:getPosition()
+                        self.px = px
+                        self.py = py
+                        self.playx = pyx
+                        self.playy = pyy
+                        self.angle = math.atan2(self.playy - py, self.playx - px)
+                    end
+
+                    local forceX = math.cos(self.angle) * 500
+                    local forceY = math.sin(self.angle) * 500
+
+                    self.newBody:applyLinearImpulse(forceX, forceY)
+                    self.dashCount = self.dashCount - 1
+                    self.dashWait = 0.07
+                else
+                    self.dashWait = self.dashWait - dt
+                end
+            end
+            if self.dashCount <= 0 then
+                self.dashCount = self.dashAmount
+                self.dashDelayTimer = self.dashDelay
+            end
+        else
+            self.dashDelayTimer = self.dashDelayTimer - dt
+        end
     end
 end
 

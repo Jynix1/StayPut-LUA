@@ -11,8 +11,8 @@ function Projectile.new(world, x, y, direction, type)
 
     if type == "bullet" then
         self.speed = 275
-        self.damage = 25
-        self.lifetime = 4
+        self.damage = 30
+        self.lifetime = 6
         self.shape = "circle"
         self.radius = 11
         

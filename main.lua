@@ -8,6 +8,7 @@ end
 
 local Player = require("baller")
 local object = require("objects")
+local lastEnemy = nil
 
 local discordrefreshTimer = 0
 
@@ -88,7 +89,7 @@ local spawnKeyConfig = { --
 	["3"] = "bomb",
 	["4"] = "tripwire",
 	["5"] = "zip",
-} --
+}
 
 local Menu = require("menu")
 local discordRPC = require("discordRPC")
@@ -124,7 +125,7 @@ local function updateDiscordPresence()
 end
 
 function love.load()
-	love.graphics.setDefaultFilter("nearest", "nearest")
+	love.graphics.setDefaultFilter("linear", "linear")
 
 	love.physics.setMeter(64)
 	world = love.physics.newWorld(0, 15 * 64, true)
@@ -154,6 +155,7 @@ function love.load()
 	IntroFrame = 1
 	IntroFrameDelay = 0.5
 	IntroPlayedBefore = false
+	Fullscreen = false
 
 	IntroFrames = {
 		love.graphics.newImage("sprites/mspawn/mspawn1.png"),
@@ -181,6 +183,7 @@ function love.load()
 	settingsFont = love.graphics.newFont("fonts/tiny5.ttf", 36)
 	tobyfont = love.graphics.newFont("fonts/toby.otf", 32)
 	smalltobyfont = love.graphics.newFont("fonts/toby.otf", 18)
+	love.graphics.setDefaultFilter("nearest", "nearest")
 
 	function beginContact(a, b, contact)
 		local dataA = a:getUserData()
@@ -201,6 +204,13 @@ function love.load()
 	end
 	print("discordRPC.available =", discordRPC.available)
 	print("discordRPC.status =", discordRPC.status)
+
+	gameWidth = 1066
+    gameHeight = 600
+
+    --gameCanvas = love.graphics.newCanvas(gameWidth, gameHeight) 
+    --gameCanvas:setFilter("nearest", "nearest")
+
 end
 
 function love.update(dt) --                                                                                               ----  v v v  | main game loop |  v v v  ----
@@ -270,7 +280,24 @@ function love.update(dt) --                                                     
 					if #RoundData.enemiesActive > 0 then
 						local random = love.math.random(1, #RoundData.enemiesActive)
 						local enemyIdToSpawn = RoundData.enemiesActive[random]
+						if lastEnemy ~= nil and lastEnemy == "tripwire" and enemyIdToSpawn == "tripwire" and #RoundData.enemiesActive > 1 then
+							repeat
+								random = love.math.random(1, #RoundData.enemiesActive)
+								enemyIdToSpawn = RoundData.enemiesActive[random]
+							until enemyIdToSpawn ~= "tripwire"
+						end
 
+						--if not (lastEnemy == nil) and #RoundData.enemiesActive > 1 then
+						--	if lastEnemy == enemyIdToSpawn then
+						--repeat
+                    	--	local random = love.math.random(1, #RoundData.enemiesActive)
+                    	--	enemyIdToSpawn = RoundData.enemiesActive[random]
+                		--	until enemyIdToSpawn ~= lastEnemy
+						--	end
+						--end
+
+						lastEnemy = enemyIdToSpawn
+						
 						local spawnX = love.math.random(200, 866)
 
 						local enemyCD = 0
@@ -334,7 +361,20 @@ function love.quit()
 end
 
 function love.draw() --                                                                                        ----  v v v  | all drawing |  v v v  ----
-	
+
+	love.graphics.clear(0, 0, 0)
+    local windowWidth = love.graphics.getWidth()
+    local windowHeight = love.graphics.getHeight()
+    local scale = math.min(windowWidth / gameWidth, windowHeight / gameHeight)
+    local offsetX = (windowWidth - (gameWidth * scale)) / 2
+    local offsetY = (windowHeight - (gameHeight * scale)) / 2
+
+	love.graphics.push()
+	love.graphics.translate(math.floor(offsetX),math.floor(offsetY))
+	love.graphics.scale(scale,scale)
+
+	--------------
+
 	local showIndicator = false
 	local ix,iy = nil,nil
 
@@ -372,7 +412,7 @@ function love.draw() --                                                         
 		local offset = 65
 		local indicateIMAGE = indicator
 
-		if px > 1066 or px < 0 or py < 0 or py > 600 then------------------------------------------- !!!!! 						!						unfinished
+		if px > 1066 or px < 0 or py < 0 or py > 600 then
 
 			if py>600 then indicateIMAGE = indicatorD end
 			if py<0 then indicateIMAGE = indicatorU	end
@@ -387,11 +427,12 @@ function love.draw() --                                                         
 		if showIndicator then
 			love.graphics.draw(indicateIMAGE,ix,iy,0,sX,sY,ox,oy)
 		end
+
 	end
 
-	if not menuVisible and not settingsVisible then
-		local ww = love.graphics.getWidth()
-		local wh = love.graphics.getHeight()
+	if gameStarted then
+		local ww = gameWidth
+		local wh = gameHeight
 
 		if not RoundData.enemyPicker then
 			love.graphics.printf(string.format("%.1f", RoundData.time), 0, 35, ww, "center")
@@ -401,15 +442,14 @@ function love.draw() --                                                         
 	end
 
 	if RoundData.enemyPicker and gameStarted and not IntroPlaying then -------------------- drawing choice buttons
-		love.mouse.setCursor()
+		
 		for i, btn in ipairs(ChoiceButtons) do
 			local designY = btn.y + math.sin(love.timer.getTime()) * 10
 			local btnY = designY + 50
-			local mx, my = love.mouse.getPosition()
+			local mx, my = getVirtualMousePosition(love.mouse.getPosition())
+			
 
 			if mx < btn.x + btn.width and mx > btn.x and my < btn.y + btn.height and my > btn.y then
-				local cur = love.mouse.getSystemCursor("hand")
-				love.mouse.setCursor(cur)
 				love.graphics.setColor(1, 0, 0, 0.15)
 			else
 				love.graphics.setColor(0, 0, 0, 0.5)
@@ -435,30 +475,42 @@ function love.draw() --                                                         
 	end
 
 	if settingsVisible then ---------------- drawing settings menu
-		love.graphics.setColor(0, 0, 0, 0.7)
-		love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+	
+		--menu:draw()
+	
+		--love.graphics.setColor(0, 0, 0, 0.7)
+		--love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
 
-		love.graphics.setColor(1, 1, 1)
-		love.graphics.setFont(settingsFont)
+		--love.graphics.setColor(1, 1, 1)
+		--love.graphics.setFont(settingsFont)
 
-		love.graphics.print("SETTINGS", 300, 150)
+		--love.graphics.print("SETTINGS", 300, 150)
 
-		love.graphics.setFont(love.graphics.newFont("fonts/tiny5.ttf", 24))
-		love.graphics.print("(Not yet implemented)", 300, 250)
-		love.graphics.print("Press ESC to go back", 300, 320)
+		--love.graphics.setFont(love.graphics.newFont("fonts/tiny5.ttf", 24))
+		--love.graphics.print("(Not yet implemented)", 300, 250)
+		--love.graphics.print("Press ESC to go back", 300, 320)
 	end
+
+	-------------------
+	love.graphics.pop()
 end
 
--- Handle keyboard input for menu and game controls
+-- handle keyboard input for menu and game controls
 function love.keypressed(key)
 	if key == "escape" and not IntroPlaying then
 		if settingsVisible then
 			settingsVisible = false
 			menuVisible = true
+			menu:setScreen("main")
 		else
 			if gameStarted then
-				menuVisible = not menuVisible
-				gameRunning = not gameRunning
+				if menuVisible then
+					menuVisible = false
+					gameRunning = true
+				else
+					menuVisible = true
+					gameRunning = false
+				end
 			end
 		end
 		updateDiscordPresence()
@@ -469,7 +521,7 @@ function love.keypressed(key)
 		RoundData.time = 0
 	end
 
-	if menuVisible and not settingsVisible then
+	if menuVisible then
 		if key == "up" or key == "w" then
 			movemenuSound:clone():play()
 			menu:selectUp()
@@ -481,7 +533,7 @@ function love.keypressed(key)
 		end
 	end
 
-	if menuVisible and not settingsVisible and (key == "return" or key == "z") then
+	if menuVisible and (key == "return" or key == "z") then
 		selectSound:clone():play()
 		local selectedItem = menu:getSelectedItem()
 
@@ -489,6 +541,7 @@ function love.keypressed(key)
 			menuVisible = false
 			gameRunning = true
 			gameStarted = true
+			settingsVisible = false
 			IntroPlaying = true
 			IntroFrame = 1
 
@@ -496,7 +549,8 @@ function love.keypressed(key)
 			updateDiscordPresence()
 		elseif selectedItem == "Settings" then
 			if not gameStarted then
-				menuVisible = false
+				menu:setScreen("settings")
+				menuVisible = true
 				settingsVisible = true
 				updateDiscordPresence()
 			else
@@ -506,14 +560,21 @@ function love.keypressed(key)
 			love.system.openURL("https://stayput.my.canva.site/")
 		elseif selectedItem == "Quit" then
 			love.event.quit()
+		elseif selectedItem == "Back" then
+			menuVisible = true
+			menu:setScreen("menu")
+		elseif selectedItem == "Fullscreen" then
+			Fullscreen = not Fullscreen
+			love.window.setFullscreen(Fullscreen)
 		end
 	end
 end
 
 function love.mousepressed(mx, my, button)
+	local newx,newy = getVirtualMousePosition(mx,my)
 	if RoundData.enemyPicker and button == 1 then
 		for i, btn in ipairs(ChoiceButtons) do
-			if mx >= btn.x and mx <= btn.x + btn.width and my >= btn.y and my <= btn.y + btn.height then
+			if newx >= btn.x and newx <= btn.x + btn.width and newy >= btn.y and newy <= btn.y + btn.height then
 				if btn.id ~= nil then
 					table.insert(RoundData.enemiesActive, btn.id)
 					RoundData.enemyPicker = false
@@ -533,4 +594,15 @@ function passivediscordupdate(dt)
 	end
 end
 
--- TODO: improve menu UI? add settings, add design for tripwire, dash enemy?
+function getVirtualMousePosition(mx, my)
+    local windowWidth = love.graphics.getWidth()
+    local windowHeight = love.graphics.getHeight()
+    local scale = math.min(windowWidth / gameWidth, windowHeight / gameHeight)
+    local offsetX = (windowWidth - (gameWidth * scale)) / 2
+    local offsetY = (windowHeight - (gameHeight * scale)) / 2
+
+    local vx = (mx - offsetX) / scale
+    local vy = (my - offsetY) / scale
+    return vx, vy
+end
+-- TODO: improve menu UI? add settings, add design for tripwire

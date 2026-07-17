@@ -535,7 +535,7 @@ function Player:HPbarDraw()
     local pct = math.max(0, math.min(1, hpBar / hpBarMax))
     local i_frame_pct = math.max(0, math.min(1,(self.invulnTimer)/4))
 
-    local barX, barY, barW, barH = 25, 60, 175, 12
+    local barX, barY, barW, barH = 30, 45, 125, 8
     local fillW = math.max(0, pct * barW)
 
     local shakeTime = self.hurtShakeTime or 0
@@ -576,17 +576,17 @@ function Player:HPbarDraw()
         -- Bottom line
         love.graphics.line(barX, barY + barH, barX + currentW, barY + barH)
         -- Left tiny line
-        love.graphics.line(barX, barY-1, barX, barY + barH+2)
+        love.graphics.line(barX, barY-1.5, barX, barY + barH+1.5)
     end
 
-    local font = love.graphics.newFont("fonts/tiny5.ttf", 24)
+    local font = love.graphics.newFont("fonts/tiny5.ttf", 18)
     love.graphics.setFont(font)
 
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print(tostring(math.floor(hpBar)) .. "%", barX + barW + 12, barY - 8)
+    love.graphics.print(tostring(math.floor(hpBar)) .. "%", barX-2 + barW + 12, barY - 6)
 
 
-    font = love.graphics.newFont("fonts/tiny5.ttf", 40)
+    font = love.graphics.newFont("fonts/tiny5.ttf", 24)
     love.graphics.setFont(font)
 
     love.graphics.print("HP: " .. (self.hp or 0) .. "/" .. (self.maxHP or 4), 35, 10)

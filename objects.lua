@@ -132,6 +132,44 @@ function object:new(x, y, obj)
         instance.angle = nil
     end
 
+    if obj == "musicbox" then
+        instance.lifetime = 7
+
+        instance.width = 55
+        instance.height = 55
+        
+        instance.newBody = love.physics.newBody(world,x,y,"dynamic")
+        instance.shape = love.physics.newRectangleShape(instance.width,instance.height)
+        instance.fixture = love.physics.newFixture(instance.newBody,instance.shape,1.4)
+
+        instance.texture = love.graphics.newImage("sprites/musicbox.png")
+
+        local particle = love.graphics.newImage("sprites/notes.png")
+        instance.musicnote = love.graphics.newParticleSystem(particle,50)
+        instance.musicnote:setSizes(0.08,0.02)
+        instance.musicnote:setParticleLifetime(1, 1.5)
+        instance.musicnote:setEmissionRate(4)
+        instance.musicnote:setDirection(0)
+        instance.musicnote:setSpread(math.pi * 2)
+        instance.musicnote:setSpeed(100, 150)
+        instance.musicnote:setColors(1,1,1,1,1,1,1,0)
+        instance.musicnote:setSpin(1.5)
+
+        instance.fixture:setRestitution(0.9)
+        instance.newBody:setGravityScale(0.8)
+        instance.newBody:setLinearDamping(5)
+
+        instance.windup = 1.5
+        instance.slowAmount = 225
+        instance.range = 225
+        instance.soundrange = 400
+
+        instance.sound = love.audio.newSource("sounds/sfx/musicbox/copywrite.mp3","static")
+        instance.sound:setLooping(true)
+        instance.sound:setVolume(0)
+        instance.sound:play()
+    end
+
     instance.fixture:setUserData({ type = instance.obj, owner = instance })
 
     return instance
@@ -194,7 +232,7 @@ function object:draw() ----------------                                         
         love.graphics.setLineStyle("smooth")
         love.graphics.setLineWidth(4)
         love.graphics.polygon("line", self.newBody:getWorldPoints(self.shape:getPoints()))
-    elseif self.obj == "zip" then                                                                                       ---------------------------------------- fix image drawing offset
+    elseif self.obj == "zip" then
         local vx,vy = self.newBody:getLinearVelocity()
         local spd   = math.sqrt(vx ^ 2 + vy ^ 2)
         local px,py = self.newBody:getPosition()
@@ -208,6 +246,35 @@ function object:draw() ----------------                                         
         love.graphics.polygon("line", self.newBody:getWorldPoints(self.shape:getPoints()))
 
         love.graphics.draw(self.texture,px,py,0,sX,sY,300,300)
+    elseif self.obj == "musicbox" then
+        love.graphics.setColor(1,1,1,alpha)
+        love.graphics.draw(self.musicnote,0,0)
+        local px,py = self.newBody:getPosition()
+        local playerX, playerY = player.body:getPosition()
+
+        local dx = playerX - px
+        local dy = playerY - py
+        local distance = math.sqrt(dx * dx + dy * dy)
+
+        local tW,tH = self.texture:getDimensions()
+        local sX = self.width / tW
+        local sY = self.height / tH
+        local r = self.newBody:getAngle()
+
+        if distance <= self.range then
+            love.graphics.setLineStyle("smooth")
+            love.graphics.setLineWidth(math.random(8.1,16.45))
+            love.graphics.setColor(1, 1, 1)
+            love.graphics.line(px,py,playerX,playerY)
+        end
+
+        love.graphics.draw(self.texture,px,py,r,sX,sY,tW/2,tH/2)
+
+        love.graphics.setLineStyle("smooth")
+        love.graphics.setLineWidth(2)
+        love.graphics.setColor(0.9,0.9,1,0.5)
+        love.graphics.circle("line",px,py,self.range)
+        
     end
 end
 
@@ -233,6 +300,9 @@ function object:update(dt)
                 self.newBody:destroy()
             end
             self.newBody, self.shape, self.fixture = nil, nil, nil
+            if self.obj == "musicbox" then
+                self.sound:stop()
+            end
             return
         end
     end
@@ -298,7 +368,6 @@ function object:update(dt)
 
             self.newBody:applyForce(forceX, forceY)
 
-            -- if it falls too low, jump very high
             if followerY > 650 then
                 self.newBody:applyLinearImpulse(0, -700)
             end
@@ -306,7 +375,6 @@ function object:update(dt)
                 self.newBody:applyLinearImpulse(0, 15)
             end
 
-            -- simple obstacle check ahead, ignoring the player body
             local checkX = followerX + (dx / distance) * 80
             local checkY = followerY + (dy / distance) * 80
 
@@ -446,6 +514,18 @@ function object:update(dt)
         else
             self.dashDelayTimer = self.dashDelayTimer - dt
         end
+    end
+
+    if self.obj == "musicbox" then
+        local x,y = self.newBody:getPosition()
+        local px,py = player.body:getPosition()
+        local dx,dy = px-x,py-y
+        local dist = math.sqrt(dx^2 + dy^2)
+
+        self.musicnote:setPosition(x,y)
+        self.musicnote:update(dt)
+
+        self.sound:setVolume(0.1-(dist/self.soundrange)/10)
     end
 end
 

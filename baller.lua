@@ -202,7 +202,7 @@ function Player:draw()----------------------------------------------------------
 
 end
 
-function Player:jump()
+function Player:jump(force)
     local cx = self.body:getX() - 20
     local cy = self.body:getY()
     local targetY = cy + 35
@@ -247,7 +247,7 @@ function Player:jump()
 
     if standingOnGround then
         local vx,vy = self.body:getLinearVelocity()
-        self.body:setLinearVelocity(vx, -600)
+        self.body:setLinearVelocity(vx, -force*1.2)
         self.canJump = false
 
         self.pSystem:setPosition(cx+20, cy-20)
@@ -255,7 +255,7 @@ function Player:jump()
     end
 end
 
-function Player:dash(dx, dy)
+function Player:dash(dx, dy, force)
     if self.dashcooldown > 0 then
         return
     end
@@ -273,14 +273,14 @@ function Player:dash(dx, dy)
     dx = dx / length
     dy = dy / length
 
-    local dashSpeed = 900
+    local dashSpeed = force * 1.8
     self.body:setLinearVelocity(dx * dashSpeed, dy * dashSpeed)
     self.dashcooldown = 2.5
     self.starbouncePSystem:setPosition(self.body:getX(), self.body:getY())
     self.starbouncePSystem:emit(10)
 end
 
-function Player:wallbounce()
+function Player:wallbounce(force)
     local cx = self.body:getX()
     local cy = self.body:getY()
     local targetXLeft = cx - 35
@@ -310,13 +310,13 @@ function Player:wallbounce()
 
     if wallOnLeft then
         local vx, vy = self.body:getLinearVelocity()
-        self.body:setLinearVelocity(450, -350)
+        self.body:setLinearVelocity(force, -force/1.3)
 
         self.starbouncePSystem:setPosition(cx, cy)
         self.starbouncePSystem:emit(3)
     elseif wallOnRight then
         local vx, vy = self.body:getLinearVelocity()
-        self.body:setLinearVelocity(-450, -350)
+        self.body:setLinearVelocity(-force, -force/1.3)
 
         self.starbouncePSystem:setPosition(cx, cy)
         self.starbouncePSystem:emit(3)
@@ -403,8 +403,8 @@ function Player:control(up, down, left, right, dash, force)                     
     end
 
     if love.keyboard.isDown(up) and self.canJump then
-        self:wallbounce()
-        self:jump()
+        self:wallbounce(force)
+        self:jump(force)
     end
 
     if love.keyboard.isDown(down) then
@@ -425,7 +425,7 @@ function Player:control(up, down, left, right, dash, force)                     
         if love.keyboard.isDown("s") or love.keyboard.isDown("down") then
             dy = dy + 1
         end
-        self:dash(dx,dy)
+        self:dash(dx,dy,force)
     end
 end
 

@@ -28,11 +28,12 @@ RoundData = {
 }
 
 EnemyOptions = {
-	{ id = "square",   title = "Square",   desc = "A heavy box. Falls to get in your way.", 								 cd =-1	    },
-	{ id = "follower", title = "Follower", desc = "Follows and pushes the player.", 										 cd = 0  	},
-	{ id = "bomb",     title = "Bomb",     desc = "Weak object, explodes with projectiles in all directions.", 				 cd = 0.75  },
-	{ id = "zip",      title = "Zip",      desc = "A quick and heavy object that dashes toward the player multiple times.",  cd = 1		},
-	{ id = "tripwire", title = "Tripwire", desc = "A weak and light object that watches your movement, sit still for a moment to deter it.", cd = -1}
+	{ id = "square",   title = "Square",   desc = "A heavy box. Falls to get in your way.", 								 cd = -RoundData.difficultyTBO/2 },
+	{ id = "follower", title = "Follower", desc = "Follows and pushes the player.", 										 cd = 0},
+	{ id = "bomb",     title = "Bomb",     desc = "Weak object, explodes with projectiles in all directions.", 				 cd = RoundData.difficultyTBO*0.15},
+	{ id = "zip",      title = "Zip",      desc = "A quick and heavy object that dashes toward the player multiple times.",  cd = RoundData.difficultyTBO*0.25},
+	{ id = "tripwire", title = "Tripwire", desc = "A weak and light object that watches your movement, sit still for a moment to deter it.", cd = -RoundData.difficultyTBO/2},
+	{ id = "musicbox", title = "Music Box",desc = "A familiar object that slows down the player as they come near.", cd = RoundData.difficultyTBO*0.1}
 }
 
 local ChoiceButtons = {
@@ -89,6 +90,7 @@ local spawnKeyConfig = { --
 	["3"] = "bomb",
 	["4"] = "tripwire",
 	["5"] = "zip",
+	["6"] = "musicbox"
 }
 
 local Menu = require("menu")
@@ -140,12 +142,16 @@ function love.load()
 
 	errorSound = love.audio.newSource("sounds/sfx/error.mp3", "static")
 	movemenuSound = love.audio.newSource("sounds/sfx/move.mp3", "static")
+	movemenuSound:setVolume(0.4)
 	IntroSound = love.audio.newSource("sounds/sfx/move.mp3", "static")
 	IntroSound2 = love.audio.newSource("sounds/sfx/select.mp3", "static")
 	selectSound = love.audio.newSource("sounds/sfx/select.mp3", "static")
+	selectSound:setVolume(0.8)
 	equipSound = love.audio.newSource("sounds/sfx/equip.mp3", "static")
+	
 	barRecoverSound = love.audio.newSource("sounds/sfx/barheal.mp3", "static")
-	barRecoverSound:setPitch(1.2)
+	barRecoverSound:setPitch(1.3)
+	barRecoverSound:setVolume(0.65)
 
 	menuVisible = true
 	gameRunning = false
@@ -267,9 +273,26 @@ function love.update(dt) --                                                     
 				end
 			end
 
+			local moveForce = 500
+			for _, obj in ipairs(objects) do
+				if obj.obj == "musicbox" and obj.newBody then
+					local px,py = player.body:getPosition()
+					local bx,by = obj.newBody:getPosition()
+
+					local dx = px-bx
+					local dy = py-by
+					local dist = math.sqrt(dx*dx + dy*dy)
+
+					if dist <= obj.range then
+						moveForce = math.max(0,moveForce - obj.slowAmount)
+						break
+					end
+				end
+			end
+			
 			world:update(dt)
 			player:update(dt)
-			player:control("space", "s", "a", "d", "lshift", 500)
+			player:control("space", "s", "a", "d", "lshift", moveForce)
 			player:OffStageRespawn()
 
 			if RoundData.ongoing then
@@ -534,8 +557,11 @@ function love.keypressed(key)
 	end
 
 	if menuVisible and (key == "return" or key == "z") then
-		selectSound:clone():play()
 		local selectedItem = menu:getSelectedItem()
+
+		if selectedItem ~= "Fullscreen" then
+			selectSound:clone():play()
+		end
 
 		if selectedItem == "Start Game" or selectedItem == "Resume Game" then
 			menuVisible = false
@@ -566,6 +592,7 @@ function love.keypressed(key)
 		elseif selectedItem == "Fullscreen" then
 			Fullscreen = not Fullscreen
 			love.window.setFullscreen(Fullscreen)
+			equipSound:clone():play()
 		end
 	end
 end
@@ -605,4 +632,4 @@ function getVirtualMousePosition(mx, my)
     local vy = (my - offsetY) / scale
     return vx, vy
 end
--- TODO: improve menu UI? add settings, add design for tripwire
+-- TODO: improve menu UI!!! add design for tripwire,  add audio settings.

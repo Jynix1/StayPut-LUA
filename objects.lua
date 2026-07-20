@@ -57,7 +57,7 @@ function object:new(x, y, obj)
         instance.fixture:setRestitution(0.8)  -- Make it bouncy
 
         instance.fusetime = 3                 -- seconds until explosion
-        instance.timeAfterExplosion = 2       -- seconds after explosion before removal
+        instance.timeafterdead = 2       -- seconds after explosion before removal
         instance.exploded = false
         instance.lastX = 0
         instance.lastY = 0
@@ -105,7 +105,7 @@ function object:new(x, y, obj)
 
         instance.newBody = love.physics.newBody(world, x, y, "dynamic")
         instance.shape = love.physics.newRectangleShape(70, 70)
-        instance.fixture = love.physics.newFixture(instance.newBody, instance.shape, 1.4)
+        instance.fixture = love.physics.newFixture(instance.newBody, instance.shape, 1.25)
 
         instance.texture = love.graphics.newImage("sprites/zip.png")
 
@@ -168,6 +168,41 @@ function object:new(x, y, obj)
         instance.sound:setLooping(true)
         instance.sound:setVolume(0)
         instance.sound:play()
+    end
+
+    if obj == "tripmine" then
+        instance.lifetime = 10
+
+        instance.width = 55
+        instance.height = 55
+
+        instance.newBody = love.physics.newBody(world,x,y,"dynamic")
+        instance.shape = love.physics.newRectangleShape(instance.width,instance.height)
+        instance.fixture = love.physics.newFixture(instance.newBody,instance.shape,0.6)
+        instance.newBody:setGravityScale(0.85)
+        instance.texture = love.graphics.newImage("sprites/trih.png")
+
+        local particle = love.graphics.newImage("sprites/trihp.png")
+        instance.explodep = love.graphics.newParticleSystem(particle,50)
+        instance.explodep:setSizes(0.28,0.22)
+        instance.explodep:setParticleLifetime(1, 1.5)
+        instance.explodep:setEmissionRate(0)
+        instance.explodep:setDirection(0)
+        instance.explodep:setSpread(math.pi * 2)
+        instance.explodep:setSpeed(100,450)
+        instance.explodep:setColors(
+            0,1,1,1,
+            1,0.8,0.8,0
+        )
+        instance.explodep:setSpin(15,0)
+
+        instance.spawn = love.audio.newSource("sounds/sfx/tripmine/spawn.mp3","static")
+        instance.boom = love.audio.newSource("sounds/sfx/tripmine/boom.mp3","static")
+        instance.delay = 2
+        instance.halfdead = false -- delete body/shape/fixture or turn into invis sensor, keep particles visible
+        instance.timeafterdead = 3 -- then delete obj
+
+        instance.spawn:clone():play()
     end
 
     instance.fixture:setUserData({ type = instance.obj, owner = instance })
@@ -275,6 +310,19 @@ function object:draw() ----------------                                         
         love.graphics.setColor(0.9,0.9,1,0.5)
         love.graphics.circle("line",px,py,self.range)
         
+    elseif self.obj == "tripmine" then
+        love.graphics.setColor(1,1,1,1)
+        love.graphics.draw(self.explodep,0,0)
+        love.graphics.setColor(1,1,1,alpha)
+
+        local x,y = self.newBody:getPosition()
+        local tW,tH = self.texture:getDimensions()
+        local sx,sy = self.width/tW,self.height/tH
+        local r = self.newBody:getAngle()
+
+        if not self.halfdead then
+            love.graphics.draw(self.texture,x,y,r,sx*1.4,sy*1.4,tW/2,tH/2)
+        end
     end
 end
 
@@ -285,10 +333,10 @@ function object:update(dt)
 
     self.lifetime = self.lifetime - dt
 
-    if self.lifetime <= 0 then
-        if self.timeAfterExplosion then
-            self.timeAfterExplosion = self.timeAfterExplosion - dt
-            if self.timeAfterExplosion <= 0 then
+    if self.lifetime <= 0 then -- -- -- -- - - - - - - - lifetime stuff
+        if self.timeafterdead then
+            self.timeafterdead = self.timeafterdead - dt
+            if self.timeafterdead <= 0 then
                 if self.newBody then
                     self.newBody:destroy()
                 end
@@ -305,7 +353,7 @@ function object:update(dt)
             end
             return
         end
-    end
+    end -- - - - - - - - - - - - -  - - - - -  - - - - --
 
     self.exParticleSystem:update(dt)
     --
@@ -526,6 +574,30 @@ function object:update(dt)
         self.musicnote:update(dt)
 
         self.sound:setVolume(0.1-(dist/self.soundrange)/10)
+    end
+
+    if self.obj == "tripmine" then
+        local mineX, mineY = self.newBody:getPosition()
+        local playerX, playerY = player.body:getPosition()
+
+        self.explodep:setPosition(mineX,mineY)
+        self.explodep:update(dt)
+
+        local dx = playerX - mineX
+        local dy = playerY - mineY
+
+        local triggerDistance = 57
+
+        if dx * dx + dy * dy <= triggerDistance * triggerDistance and self.halfdead == false then
+            self.boom:clone():play()
+            player:takeBarDamage(75)
+            self.lifetime = 1
+            self.halfdead = true
+            if self.fixture then self.fixture:setSensor(true) end
+            if self.newBody then self.newBody:setActive(false) end
+            self.explodep:emit(40)
+            self.boom:clone():play()
+        end
     end
 end
 

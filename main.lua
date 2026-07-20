@@ -33,7 +33,8 @@ EnemyOptions = {
 	{ id = "bomb",     title = "Bomb",     desc = "Weak object, explodes with projectiles in all directions.", 				 cd = RoundData.difficultyTBO*0.15},
 	{ id = "zip",      title = "Zip",      desc = "A quick and heavy object that dashes toward the player multiple times.",  cd = RoundData.difficultyTBO*0.25},
 	{ id = "tripwire", title = "Tripwire", desc = "A weak and light object that watches your movement, sit still for a moment to deter it.", cd = -RoundData.difficultyTBO/2},
-	{ id = "musicbox", title = "Music Box",desc = "A familiar object that slows down the player as they come near.", cd = RoundData.difficultyTBO*0.1}
+	{ id = "musicbox", title = "Music Box",desc = "A familiar object that slows down the player as they come near.", 		 cd = RoundData.difficultyTBO*0.1},
+	{ id = "tripmine", title = "Tripmine", desc = "Touching this small and light object will chip off 75% of your current HP. The corners are safe.", cd = 0},
 }
 
 local ChoiceButtons = {
@@ -90,7 +91,8 @@ local spawnKeyConfig = { --
 	["3"] = "bomb",
 	["4"] = "tripwire",
 	["5"] = "zip",
-	["6"] = "musicbox"
+	["6"] = "musicbox",
+	["7"] = "tripmine",
 }
 
 local Menu = require("menu")
@@ -187,6 +189,7 @@ function love.load()
 	updateDiscordPresence()
 
 	settingsFont = love.graphics.newFont("fonts/tiny5.ttf", 36)
+	timerFont = love.graphics.newFont("fonts/tiny5.ttf", 44)
 	tobyfont = love.graphics.newFont("fonts/toby.otf", 32)
 	smalltobyfont = love.graphics.newFont("fonts/toby.otf", 18)
 	love.graphics.setDefaultFilter("nearest", "nearest")
@@ -257,7 +260,7 @@ function love.update(dt) --                                                     
 			for i = #objects, 1, -1 do -- update objects
 				local obj = objects[i]
 				obj:update(dt)
-				if obj.lifetime <= 0 then
+				if obj.lifetime <= 0 and (not obj.timeafterdead or obj.timeafterdead <= 0)then
 					table.remove(objects, i)
 				end
 			end
@@ -309,15 +312,6 @@ function love.update(dt) --                                                     
 								enemyIdToSpawn = RoundData.enemiesActive[random]
 							until enemyIdToSpawn ~= "tripwire"
 						end
-
-						--if not (lastEnemy == nil) and #RoundData.enemiesActive > 1 then
-						--	if lastEnemy == enemyIdToSpawn then
-						--repeat
-                    	--	local random = love.math.random(1, #RoundData.enemiesActive)
-                    	--	enemyIdToSpawn = RoundData.enemiesActive[random]
-                		--	until enemyIdToSpawn ~= lastEnemy
-						--	end
-						--end
 
 						lastEnemy = enemyIdToSpawn
 						
@@ -456,9 +450,9 @@ function love.draw() --                                                         
 	if gameStarted then
 		local ww = gameWidth
 		local wh = gameHeight
-
+		love.graphics.setFont(timerFont)
 		if not RoundData.enemyPicker then
-			love.graphics.printf(string.format("%.1f", RoundData.time), 0, 35, ww, "center")
+			love.graphics.printf(string.format("%.1f", RoundData.time), 0, 30, ww, "center")
 		end
 		love.graphics.setFont(smalltobyfont)
 		love.graphics.printf(RoundData.level, 0, 10, ww, "center")
@@ -472,7 +466,7 @@ function love.draw() --                                                         
 			local mx, my = getVirtualMousePosition(love.mouse.getPosition())
 			
 
-			if mx < btn.x + btn.width and mx > btn.x and my < btn.y + btn.height and my > btn.y then
+			if mx < btn.x + btn.width and mx > btn.x and my < btn.y + btn.height and my > btn.y and btn.title ~= "No Option" then
 				love.graphics.setColor(1, 0, 0, 0.15)
 			else
 				love.graphics.setColor(0, 0, 0, 0.5)
@@ -542,6 +536,12 @@ function love.keypressed(key)
 
 	if key == "backspace" then
 		RoundData.time = 0
+	end
+
+	if key == "f11" then
+		Fullscreen = not Fullscreen
+		love.window.setFullscreen(Fullscreen)
+		equipSound:clone():play()
 	end
 
 	if menuVisible then

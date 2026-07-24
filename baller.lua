@@ -49,6 +49,10 @@ function Player.new(world, x, y)
     instance.currentImage = nil
 
     instance.sfx_power = love.audio.newSource("sounds/sfx/power.mp3","static")
+    instance.sfx_chipdmg = love.audio.newSource("sounds/sfx/tick.mp3","static")
+    instance.sfx_chipdmg:setPitch(0.25)
+
+    instance.sfx_dmg = love.audio.newSource("sounds/sfx/hurt.mp3","static")
 
     instance.canJump = true
     instance.dashcolor = false
@@ -85,18 +89,21 @@ function Player.new(world, x, y)
     end)
 
     instance.damagePSystem = love.graphics.newParticleSystem(triCanvas, 80)
-    instance.damagePSystem:setParticleLifetime(0.5, 1.0)
+    instance.damagePSystem:setParticleLifetime(1, 1.5)
     instance.damagePSystem:setEmissionRate(0)
-    instance.damagePSystem:setSpeed(250, 500)
+    instance.damagePSystem:setSpeed(650,625)
+    instance.damagePSystem:setLinearDamping(50)
     instance.damagePSystem:setSpread(math.pi * 2)
     instance.damagePSystem:setLinearDamping(1,3)
     instance.damagePSystem:setSizes(3, 0.8, 0)
+    instance.damagePSystem:setSpin(10,5)
+    instance.damagePSystem:setSpinVariation(1)
     instance.damagePSystem:setColors(1, 0.4, 0.4, 0.9, 1, 0.2, 0.2, 0)
 
     local starbounceCanvas = love.graphics.newCanvas(24, 24)
     starbounceCanvas:renderTo(function()
         love.graphics.clear()
-        love.graphics.setColor(0.169, 0, 1)
+        love.graphics.setColor(1, 1, 1)
 
         local points = {}
         local spikes = 5
@@ -122,6 +129,9 @@ function Player.new(world, x, y)
     for i = 1, 5 do
         IntroFrames[i] = love.graphics.newImage("sprites/mspawn/mspawn" .. i .. ".png")
     end
+
+    instance.dmgfont = love.graphics.newFont("fonts/byteb.ttf",58)
+    instance.damageNumbers = {}
 
     return instance
 end
@@ -200,6 +210,13 @@ function Player:draw()----------------------------------------------------------
 
     self:HPbarDraw()
 
+    love.graphics.setFont(self.dmgfont)
+    if #self.damageNumbers > 0 then
+        for _, item in ipairs(self.damageNumbers) do
+            love.graphics.setColor(1,1,1,1)
+            love.graphics.print(item.num,item.x,item.y,0,1-item.bouncy,1+item.bouncy)
+        end
+    end
 end
 
 function Player:jump(force)
@@ -372,7 +389,15 @@ function Player:takeBarDamage(amount)
 
         self.damageParticleDelay = self.damageParticleDelayDuration
         self.hpBar = self.hpBarMax
+
+        self.sfx_dmg:clone():play()
+    else
+        self.sfx_chipdmg:clone():play()
     end
+
+    local x,y = self.body:getPosition()
+    self:spawndmgnum(amount,3,x+20,y-20,1,1)
+    
 end
 
 function Player:control(up, down, left, right, dash, force)                        -------------------------------------------- player control
@@ -527,6 +552,30 @@ function Player:update(dt)                                                     -
            self.hpRefill = 0
        end 
     end
+
+    for i = #self.damageNumbers, 1, -1 do
+        local item = self.damageNumbers[i]
+        
+        item.x = item.x + item.vx*dt
+        item.y = item.y + item.vy*dt
+        item.vx = item.vx * (1 - 4*dt)
+        item.bouncy = item.bouncy * (1 - 4*dt)
+
+        item.vy = item.vy + (1500*dt)
+        if item.y >= item.spawnY then
+            if item.bounces > 0 then
+                item.vy = item.spawnvy*(item.bounces/item.spawnbounces)
+                item.bounces = item.bounces - 1
+            else
+                item.vy = 0
+            end
+        end
+
+        item.lifetime = item.lifetime - dt
+        if item.lifetime <= 0 then
+            table.remove(self.damageNumbers,i)
+        end
+    end
 end
 
 function Player:HPbarDraw()
@@ -593,6 +642,24 @@ function Player:HPbarDraw()
     love.graphics.print("HP: " .. (self.hp or 0) .. "/" .. (self.maxHP or 4), 35, 10)
 
     love.graphics.pop()
+end
+
+function Player:spawndmgnum(num,lifetime,x,spawnY,sx,sy)
+    table.insert(self.damageNumbers, {
+        num = num or 0,
+        lifetime = lifetime or 3,
+        x = x or 0,
+        spawnY = spawnY or 0,
+        y = spawnY,
+        sx = sx or 1,
+        sy = sy or 1,
+        vx = 350,
+        spawnvy = -350,
+        vy = -400,
+        spawnbounces = 3,
+        bounces = 3,
+        bouncy = 1,
+    })
 end
 
 return Player

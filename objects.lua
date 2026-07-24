@@ -138,7 +138,7 @@ function object:new(x, y, obj)
         instance.width = 55
         instance.height = 55
         
-        instance.newBody = love.physics.newBody(world,x,y,"dynamic")
+        instance.newBody = love.physics.newBody(world,x,y-225,"dynamic")
         instance.shape = love.physics.newRectangleShape(instance.width,instance.height)
         instance.fixture = love.physics.newFixture(instance.newBody,instance.shape,1.4)
 
@@ -165,9 +165,11 @@ function object:new(x, y, obj)
         instance.soundrange = 400
 
         instance.sound = love.audio.newSource("sounds/sfx/musicbox/copywrite.mp3","static")
+        instance.spawnsound = love.audio.newSource("sounds/sfx/musicbox/spawn.mp3","static")
         instance.sound:setLooping(true)
         instance.sound:setVolume(0)
         instance.sound:play()
+        instance.spawnsound:play()
     end
 
     if obj == "tripmine" then

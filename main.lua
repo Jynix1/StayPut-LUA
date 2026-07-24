@@ -633,3 +633,4 @@ function getVirtualMousePosition(mx, my)
     return vx, vy
 end
 -- TODO: improve menu UI!!! add design for tripwire,  add audio settings.
+-- TODO: FINISH DAMAGE NUMBERS, go to baller.lua DRAWING func, use new font made in player.new 

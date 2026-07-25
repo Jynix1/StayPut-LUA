@@ -22,15 +22,11 @@ jobs:
           default_bump: patch
           custom_tag: '0.0.1'
 
-      - name: Package Source Code to .love
-        run: |
-          Compress-Archive -Path * -DestinationPath game.love
-
       - name: Build Windows Binaries
         uses: love-actions/love-actions-windows@v1
         with:
           product-name: 'StayPutLUA'
-          love-package: 'game.love'
+          love-package: '${{ github.workspace }}'
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

@@ -1,12 +1,16 @@
-name: auto release LOVE
+name: Auto Release StayPutLUA
 
 on:
   push:
     branches:
       - main
 
+# REQUIRED: Grants the workflow permission to push tags and create releases
+permissions:
+  contents: write
+
 jobs:
-  bump-version-and-release:
+  build-and-release:
     runs-on: windows-latest
     steps:
       - name: Checkout Code
@@ -20,7 +24,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           default_bump: patch
-          custom_tag: '0.0.1'
+          # Removed 'custom_tag' so it automatically increments (0.0.1 -> 0.0.2 etc.)
 
       - name: Create .love Package
         run: |
@@ -30,16 +34,22 @@ jobs:
       - name: Download Official LÖVE Engine
         shell: powershell
         run: |
-          Invoke-WebRequest -Uri "https://github.com" -OutFile love-win64.zip
+          # Fixed URL: Now points directly to the official 11.5 Windows 64-bit zip
+          Invoke-WebRequest -Uri "https://github.com/love2d/love/releases/download/11.5/love-11.5-win64.zip" -OutFile love-win64.zip
           Expand-Archive -Path love-win64.zip -DestinationPath love_engine
 
       - name: Compile Windows Executable Binary
         shell: powershell
         run: |
           mkdir dist
+          # Fuses love.exe and game.love together
           cmd /c "copy /b love_engine\love-11.5-win64\love.exe + game.love dist\StayPutLUA.exe"
+          
+          # Copies necessary dependencies and license
           copy love_engine\love-11.5-win64\*.dll dist\
           copy love_engine\love-11.5-win64\license.txt dist\
+          
+          # Zips the final executable folder for the release using the new tag
           Compress-Archive -Path dist\* -DestinationPath StayPutLUA-${{ steps.tag_version.outputs.new_tag }}-Windows.zip
 
       - name: Create GitHub Release

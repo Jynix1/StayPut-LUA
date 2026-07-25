@@ -1,0 +1,38 @@
+name: auto release LOVE
+
+on:
+    push:
+        branches:
+            - main
+
+jobs:
+    bump-version-and-release:
+        runs-on: windows-latest
+        steps:
+        - name: Checkout Code
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+
+        - name: Bump Version and Push Tag
+          id: tag_version
+          uses: anothrNick/github-tag-bump@v1
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            INITIAL_VERSION: 0.0.0
+            DEFAULT_BUMP: patch
+
+        - name: Build Windows Binaries
+          uses: love-actions/love-actions-windows@v1
+          with:
+            package-name: 'MyAwesomeGame-${{ steps.tag_version.outputs.new_tag }}'
+
+        - name: Create GitHub Release
+          uses: softprops/action-gh-release@v1
+          with:
+            tag_name: ${{ steps.tag_version.outputs.new_tag }}
+            name: Release ${{ steps.tag_version.outputs.new_tag }}
+            files: |
+              artifacts/*.zip
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

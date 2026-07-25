@@ -16,7 +16,7 @@ jobs:
 
         - name: Bump Version and Push Tag
           id: tag_version
-          uses: anothrNick/github-tag-bump@v1
+          uses: mathieudutour/github-tag-action@v6.2
           env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             INITIAL_VERSION: 0.0.0
@@ -25,7 +25,7 @@ jobs:
         - name: Build Windows Binaries
           uses: love-actions/love-actions-windows@v1
           with:
-            package-name: 'MyAwesomeGame-${{ steps.tag_version.outputs.new_tag }}'
+            package-name: 'StayPutLUA-${{ steps.tag_version.outputs.new_tag }}'
 
         - name: Create GitHub Release
           uses: softprops/action-gh-release@v1

@@ -23,9 +23,9 @@ jobs:
           custom_tag: '0.0.1'
 
       - name: Create .love Package
-        shell: powershell
         run: |
-          Get-ChildItem -Path . -Exclude @(".git", ".github", "game.love") | Compress-Archive -DestinationPath game.love
+          Get-ChildItem -Path . -Exclude @(".git", ".github", "game.love", "game.zip") | Compress-Archive -DestinationPath game.zip
+          Rename-Item -Path game.zip -NewName game.love
 
       - name: Download Official LÖVE Engine
         shell: powershell

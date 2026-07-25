@@ -1,38 +1,39 @@
 name: auto release LOVE
 
 on:
-    push:
-        branches:
-            - main
+  push:
+    branches:
+      - main
 
 jobs:
-    bump-version-and-release:
-        runs-on: windows-latest
-        steps:
-        - name: Checkout Code
-          uses: actions/checkout@v4
-          with:
-            fetch-depth: 0
+  bump-version-and-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-        - name: Bump Version and Push Tag
-          id: tag_version
-          uses: mathieudutour/github-tag-action@v6.2
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            INITIAL_VERSION: 0.0.0
-            DEFAULT_BUMP: patch
+      - name: Bump Version and Push Tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          default_bump: patch
+          initial_version: 0.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-        - name: Build Windows Binaries
-          uses: love-actions/love-actions-windows@v1
-          with:
-            package-name: 'StayPutLUA-${{ steps.tag_version.outputs.new_tag }}'
+      - name: Build Windows Binaries
+        uses: love-actions/love-actions-windows@v1
+        with:
+          package-name: 'StayPutLUA-${{ steps.tag_version.outputs.new_tag }}'
 
-        - name: Create GitHub Release
-          uses: softprops/action-gh-release@v1
-          with:
-            tag_name: ${{ steps.tag_version.outputs.new_tag }}
-            name: Release ${{ steps.tag_version.outputs.new_tag }}
-            files: |
-              artifacts/*.zip
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          files: |
+            artifacts/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

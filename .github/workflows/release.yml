@@ -22,11 +22,25 @@ jobs:
           default_bump: patch
           custom_tag: '0.0.1'
 
-      - name: Build Windows Binaries
-        uses: love-actions/love-actions-windows@v1
-        with:
-          product-name: 'StayPutLUA'
-          love-package: '${{ github.workspace }}'
+      - name: Create .love Package
+        shell: powershell
+        run: |
+          Compress-Archive -Path * -DestinationPath game.love -Exclude @(".git", ".github", "game.love")
+
+      - name: Download Official LÖVE Engine
+        shell: powershell
+        run: |
+          Invoke-WebRequest -Uri "https://github.com" -OutFile love-win64.zip
+          Expand-Archive -Path love-win64.zip -DestinationPath love_engine
+
+      - name: Compile Windows Executable Binary
+        shell: powershell
+        run: |
+          mkdir dist
+          cmd /c "copy /b love_engine\love-11.5-win64\love.exe + game.love dist\StayPutLUA.exe"
+          copy love_engine\love-11.5-win64\*.dll dist\
+          copy love_engine\love-11.5-win64\license.txt dist\
+          Compress-Archive -Path dist\* -DestinationPath StayPutLUA-${{ steps.tag_version.outputs.new_tag }}-Windows.zip
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -34,6 +48,6 @@ jobs:
           tag_name: ${{ steps.tag_version.outputs.new_tag }}
           name: Release ${{ steps.tag_version.outputs.new_tag }}
           files: |
-            artifacts/*.zip
+            StayPutLUA-*-Windows.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

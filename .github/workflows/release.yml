@@ -20,6 +20,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           default_bump: patch
+          custom_tag: '0.0.1'
 
       - name: Build Windows Binaries
         uses: love-actions/love-actions-windows@v1

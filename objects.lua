@@ -68,9 +68,9 @@ function object:new(x, y, obj)
 
     if obj == "tripwire" then
         instance.lifetime = 10
-
+        instance.radius = 45
         instance.newBody = love.physics.newBody(world, x, y, "dynamic")
-        instance.shape = love.physics.newRectangleShape(60, 60)
+        instance.shape = love.physics.newCircleShape(instance.radius)
         instance.fixture = love.physics.newFixture(instance.newBody, instance.shape, 1.35)
 
         instance.fixture:setRestitution(0.8)
@@ -83,6 +83,16 @@ function object:new(x, y, obj)
         instance.RequiredStillTime = 0.5
         instance.StillTimer = 0
         instance.delay = 0.75
+        instance.spriteswitchtimer = 0.1
+
+        instance.sprites = {
+            [1] = love.graphics.newImage("sprites/stopwire/stopwire.png"),
+            [2] = love.graphics.newImage("sprites/stopwire/stopwire_L.png"),
+            [3] = love.graphics.newImage("sprites/stopwire/stopwire_R.png"),
+            [4] = love.graphics.newImage("sprites/stopwire/stopwire_AL.png"),
+            [5] = love.graphics.newImage("sprites/stopwire/stopwire_AR.png"),
+        }
+        instance.texture = instance.sprites[1]
 
         local ticksnd = love.audio.newSource("sounds/sfx/tripwire/tick.mp3", "static")
         ticksnd:setPitch(2)
@@ -94,8 +104,6 @@ function object:new(x, y, obj)
         instance.DangerSound:setPitch(2)
         instance.FailSound = love.audio.newSource("sounds/sfx/tripwire/fail.mp3", "static")
         instance.AppearSound = love.audio.newSource("sounds/sfx/tripwire/appear.mp3", "static")
-
-
 
         instance.AppearSound:clone():play()
     end
@@ -266,9 +274,16 @@ function object:draw() ----------------                                         
         end
     elseif self.obj == "tripwire" then
         love.graphics.setColor(1, 1, 1, alpha)
-        love.graphics.setLineStyle("smooth")
-        love.graphics.setLineWidth(4)
-        love.graphics.polygon("line", self.newBody:getWorldPoints(self.shape:getPoints()))
+        --love.graphics.setLineStyle("smooth")
+        --love.graphics.setLineWidth(4)
+        --love.graphics.polygon("line", self.newBody:getWorldPoints(self.shape:getPoints()))
+        local px,py = self.newBody:getPosition()
+        local tW,tY = 600,600
+        local sX    = self.radius*2.2 / tW
+        local sY    = self.radius*2.2 / tY
+
+        love.graphics.draw(self.texture,px,py,0,sX,sY,tW/2,tY/2)
+
     elseif self.obj == "zip" then
         local vx,vy = self.newBody:getLinearVelocity()
         local spd   = math.sqrt(vx ^ 2 + vy ^ 2)
@@ -499,9 +514,24 @@ function object:update(dt)
             end
         end
 
-        print("1 " .. tostring(player.moving))
-        print("2 " .. self.StillTimer)
-        print("3 " .. self.checkTime)
+        self.spriteswitchtimer = self.spriteswitchtimer - dt
+        if self.spriteswitchtimer <= 0 and self.delay <= 0 then
+            if self.checkTime > 1 then
+                if self.texture == self.sprites[2] then
+                    self.texture = self.sprites[3]
+                else
+                    self.texture = self.sprites[2]
+                end
+                self.spriteswitchtimer = 0.1
+            else
+                if self.texture == self.sprites[4] then
+                    self.texture = self.sprites[5]
+                else
+                    self.texture = self.sprites[4]
+                end
+                self.spriteswitchtimer = 0.2
+            end
+        end
     end
 
     if self.obj == "zip" then

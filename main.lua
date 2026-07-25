@@ -32,7 +32,7 @@ EnemyOptions = {
 	{ id = "follower", title = "Follower", desc = "Follows and pushes the player.", 										 cd = 0},
 	{ id = "bomb",     title = "Bomb",     desc = "Weak object, explodes with projectiles in all directions.", 				 cd = RoundData.difficultyTBO*0.15},
 	{ id = "zip",      title = "Zip",      desc = "A quick and heavy object that dashes toward the player multiple times.",  cd = RoundData.difficultyTBO*0.25},
-	{ id = "tripwire", title = "Tripwire", desc = "A weak and light object that watches your movement, sit still for a moment to deter it.", cd = -RoundData.difficultyTBO/2},
+	{ id = "tripwire", title = "Stopwire", desc = "A weak and light object that watches your movement, sit still for a moment to deter it.", cd = -RoundData.difficultyTBO/2},
 	{ id = "musicbox", title = "Music Box",desc = "A familiar object that slows down the player as they come near.", 		 cd = RoundData.difficultyTBO*0.1},
 	{ id = "tripmine", title = "Tripmine", desc = "Touching this small and light object will chip off 75% of your current HP. The corners are safe.", cd = 0},
 }
@@ -632,5 +632,4 @@ function getVirtualMousePosition(mx, my)
     local vy = (my - offsetY) / scale
     return vx, vy
 end
--- TODO: improve menu UI!!! add design for tripwire,  add audio settings.
--- TODO: FINISH DAMAGE NUMBERS, go to baller.lua DRAWING func, use new font made in player.new 
+-- TODO: improve menu UI maybe, add design for tripwire,  add audio settings.

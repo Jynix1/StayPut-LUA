@@ -45,9 +45,12 @@ jobs:
           # Fuses love.exe and game.love together
           cmd /c "copy /b love_engine\love-11.5-win64\love.exe + game.love dist\StayPutLUA.exe"
           
-          # Copies necessary dependencies and license
+          # Copies necessary LÖVE dependencies and license
           copy love_engine\love-11.5-win64\*.dll dist\
           copy love_engine\love-11.5-win64\license.txt dist\
+          
+          # Copies the custom Discord RPC DLL into the same folder as the .exe
+          copy discord-rpc.dll dist\
           
           # Zips the final executable folder for the release using the new tag
           Compress-Archive -Path dist\* -DestinationPath StayPutLUA-${{ steps.tag_version.outputs.new_tag }}-Windows.zip

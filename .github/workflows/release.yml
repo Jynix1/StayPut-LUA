@@ -18,10 +18,8 @@ jobs:
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.2
         with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           default_bump: patch
-          initial_version: 0.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Windows Binaries
         uses: love-actions/love-actions-windows@v1

@@ -25,7 +25,7 @@ jobs:
       - name: Create .love Package
         shell: powershell
         run: |
-          Compress-Archive -Path * -DestinationPath game.love -Exclude @(".git", ".github", "game.love")
+          Get-ChildItem -Path . -Exclude @(".git", ".github", "game.love") | Compress-Archive -DestinationPath game.love
 
       - name: Download Official LÖVE Engine
         shell: powershell

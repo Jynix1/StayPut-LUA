@@ -19,11 +19,15 @@ function Player.new(world, x, y)
     instance.hpBar = 100
     instance.hpBarMax = 100
     instance.invulnTimer = 0
-    instance.invulnDuration = 3
+    instance.invulnDuration = 2.5
     instance.backupinvulnduration = 0.05
     instance.backupinvulntimer = 0
     instance.damageParticleDelay = 0
     instance.damageParticleDelayDuration = 1/60
+    instance.maxDoubleJumps = 0
+    instance.DoubleJumps = 0
+
+    instance.statusEffects = {}
 
     instance.hpRefill = 0
     instance.healQueue = 0
@@ -47,6 +51,7 @@ function Player.new(world, x, y)
     instance.imagemint3 = love.graphics.newImage("sprites/mint/mint3.png")
     instance.imagemint4 = love.graphics.newImage("sprites/mint/mint4.png")
     instance.currentImage = nil
+    instance.redness = 0
 
     instance.sfx_power = love.audio.newSource("sounds/sfx/power.mp3","static")
     instance.sfx_chipdmg = love.audio.newSource("sounds/sfx/tick.mp3","static")
@@ -57,6 +62,7 @@ function Player.new(world, x, y)
     instance.canJump = true
     instance.dashcolor = false
     instance.dashcooldown = 0
+    instance.dashCDReduction = 0
     instance.hurtShakeTime = 0
     instance.hurtShakeAmount = 12
     instance.emitD = 0
@@ -73,34 +79,47 @@ function Player.new(world, x, y)
 
     instance.pSystem:setParticleLifetime(0.4, 0.8) 
     instance.pSystem:setEmissionRate(0)
-    instance.pSystem:setSpeed(40,100)              
+    instance.pSystem:setSpeed(10,20)              
 
     instance.pSystem:setSpread(math.pi * 2)        
-    instance.pSystem:setLinearAcceleration(0, 50)  
+    instance.pSystem:setLinearAcceleration(0, 50)
 
     instance.pSystem:setColors(1, 1, 1, 0.6, 1, 1, 1, 0)
     instance.pSystem:setSizes(1, 0.5, 0)
 
-    local triCanvas = love.graphics.newCanvas(24, 24)
+    instance.pSystem2 = love.graphics.newParticleSystem(pCanvas, 100)
+    instance.pSystem2:setParticleLifetime(0.3, 0.5)
+    instance.pSystem2:setEmissionRate(0)
+    instance.pSystem2:setSpeed(100,120)
+    instance.pSystem2:setSpread(math.pi * 2)
+    instance.pSystem2:setLinearAcceleration(0, 400)
+
+    instance.pSystem2:setColors(1, 1, 1, 0.6, 1, 1, 1, 0)
+    instance.pSystem2:setSizes(1.5, 0.5, 0)
+    
+    local triCanvas = love.graphics.newCanvas(200, 200)
     triCanvas:renderTo(function()
         love.graphics.clear()
         love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.polygon("fill", 12, 4, 4, 20, 20, 20)
+        love.graphics.polygon("fill", 0,200, 100,0, 200,200)
     end)
 
-    instance.damagePSystem = love.graphics.newParticleSystem(triCanvas, 80)
-    instance.damagePSystem:setParticleLifetime(1, 1.5)
-    instance.damagePSystem:setEmissionRate(0)
-    instance.damagePSystem:setSpeed(650,625)
-    instance.damagePSystem:setLinearDamping(50)
-    instance.damagePSystem:setSpread(math.pi * 2)
-    instance.damagePSystem:setLinearDamping(1,3)
-    instance.damagePSystem:setSizes(3, 0.8, 0)
-    instance.damagePSystem:setSpin(10,5)
-    instance.damagePSystem:setSpinVariation(1)
-    instance.damagePSystem:setColors(1, 0.4, 0.4, 0.9, 1, 0.2, 0.2, 0)
 
-    local starbounceCanvas = love.graphics.newCanvas(24, 24)
+    instance.damagePSystem = love.graphics.newParticleSystem(triCanvas, 80)
+    instance.damagePSystem:setParticleLifetime(1.5, 2)
+    instance.damagePSystem:setEmissionRate(0)
+    instance.damagePSystem:setSpeed(700)
+    instance.damagePSystem:setSpread(math.pi * 2)
+    instance.damagePSystem:setLinearDamping(5)
+    instance.damagePSystem:setSizes(0.1)
+    instance.damagePSystem:setSpin(15,0)
+    instance.damagePSystem:setLinearAcceleration(0, 250, 0, 900)
+    instance.damagePSystem:setColors(
+        1, 1, 1, 1,
+        1, 0, 0, 0
+    )
+
+    local starbounceCanvas = love.graphics.newCanvas(200, 200)
     starbounceCanvas:renderTo(function()
         love.graphics.clear()
         love.graphics.setColor(1, 1, 1)
@@ -109,23 +128,24 @@ function Player.new(world, x, y)
         local spikes = 5
         for i = 1, spikes * 2 do
             local angle = (i - 1) * math.pi / spikes
-            local r = (i % 2 == 0) and 10 or 5
-            points[#points + 1] = 12 + math.cos(angle) * r
-            points[#points + 1] = 12 + math.sin(angle) * r
+            local r = (i % 2 == 0) and 100 or 50
+            points[#points + 1] = 100 + math.cos(angle) * r
+            points[#points + 1] = 100 + math.sin(angle) * r
         end
 
     love.graphics.polygon("fill", points)
     end)
 
     instance.starbouncePSystem = love.graphics.newParticleSystem(starbounceCanvas, 80)
-    instance.starbouncePSystem:setParticleLifetime(0.5, 1.0)
+    instance.starbouncePSystem:setParticleLifetime(0.75, 1.5)
     instance.starbouncePSystem:setEmissionRate(0)
-    instance.starbouncePSystem:setSpeed(350, 420)
+    instance.starbouncePSystem:setSpeed(350)
+    instance.starbouncePSystem:setSpin(12,1)
     instance.starbouncePSystem:setSpread(math.pi * 2)
-    instance.starbouncePSystem:setLinearDamping(2, 4)
-    instance.starbouncePSystem:setSizes(2.2, 1.4, 0)
-    instance.starbouncePSystem:setColors(1, 1, 0.4, 0.9, 1, 1, 0.2, 0)
-
+    instance.starbouncePSystem:setLinearDamping(3)
+    instance.starbouncePSystem:setLinearAcceleration(0,250,0,750)
+    instance.starbouncePSystem:setSizes(0.135)
+    instance.starbouncePSystem:setColors(1,1,1,1,1,1,1,0)
     for i = 1, 5 do
         IntroFrames[i] = love.graphics.newImage("sprites/mspawn/mspawn" .. i .. ".png")
     end
@@ -145,6 +165,7 @@ function Player:draw()----------------------------------------------------------
 
     love.graphics.setColor(1, 1, 1, alpha)
     love.graphics.draw(self.pSystem, 0, 0)
+    love.graphics.draw(self.pSystem2, 0, 0)
     love.graphics.draw(self.damagePSystem, 0, 0)
     love.graphics.draw(self.starbouncePSystem, 0, 0)
 
@@ -183,7 +204,7 @@ function Player:draw()----------------------------------------------------------
         love.graphics.setLineWidth(6)
         love.graphics.circle("line", px, py, outlineRadius-5)
     end
-    love.graphics.setColor(1, 1, 1, alpha)
+    love.graphics.setColor(1, 1-self.redness, 1-self.redness, alpha)
     love.graphics.draw(self.currentImage,px,py,angle,scaleX,scaleY,iw/2,ih/2)
 
     love.graphics.setColor(1, 1, 1, 1)
@@ -208,8 +229,6 @@ function Player:draw()----------------------------------------------------------
         love.graphics.setColor(1,1,1,1)
     end
 
-    self:HPbarDraw()
-
     love.graphics.setFont(self.dmgfont)
     if #self.damageNumbers > 0 then
         for _, item in ipairs(self.damageNumbers) do
@@ -228,7 +247,7 @@ function Player:jump(force)
     for i = 1, 5 do
         local newX = cx + (i - 1) * 10
 
-        addDebugRay(newX, cy, newX, targetY, nil, nil, nil, nil, 0.12)
+        addDebugRay(newX, cy, newX, targetY, nil, nil, nil, nil, 0.05)
 
         world:rayCast(newX, cy, newX, targetY, function(fixture, x, y, xn, yn, fraction)
 
@@ -244,17 +263,23 @@ function Player:jump(force)
 
     targetY = cy + 30
     cx = self.body:getX() - 10
+    local hitBody = nil
+    local hitBodyX, hitBodyY = 0, 0
 
     for i = 1, 5 do
         local newX = cx + (i - 1) * 5
 
-        addDebugRay(newX, cy, newX, targetY, nil, nil, nil, nil, 0.12)
+        addDebugRay(newX, cy, newX, targetY, nil, nil, nil, nil, 0.05)
 
         world:rayCast(newX, cy, newX, targetY, function(fixture, x, y, xn, yn, fraction)
 
             if fixture ~= self.fixture and not fixture:isSensor() then
                 standingOnGround = true
                 addDebugRay(newX, cy, newX, targetY, x, y, xn, yn, 1.2)
+                hitBody = fixture:getBody()
+                if hitBody:getType() == "dynamic" then
+                    hitBody:applyLinearImpulse(0, force*0.35)
+                end
                 return 0
             end
 
@@ -262,13 +287,27 @@ function Player:jump(force)
         end)
     end
 
+    if hitBody then
+        hitBodyX, hitBodyY = hitBody:getLinearVelocity()
+    end
+
     if standingOnGround then
         local vx,vy = self.body:getLinearVelocity()
-        self.body:setLinearVelocity(vx, -force*1.2)
+        self.body:setLinearVelocity(vx, (-force*1.25) + (hitBodyY * 0.25))
         self.canJump = false
 
-        self.pSystem:setPosition(cx+20, cy-20)
-        self.pSystem:emit(30)
+        self.pSystem2:setPosition(cx+15, cy+25)
+        self.pSystem2:emit(30)
+    else
+        if self.DoubleJumps > 0 then
+            local vx,vy = self.body:getLinearVelocity()
+            self.body:setLinearVelocity(vx, -force*1.2)
+            self.DoubleJumps = self.DoubleJumps - 1
+            self.canJump = false
+
+            self.pSystem2:setPosition(cx+15, cy+25)
+            self.pSystem2:emit(30)
+        end
     end
 end
 
@@ -292,7 +331,7 @@ function Player:dash(dx, dy, force)
 
     local dashSpeed = force * 1.8
     self.body:setLinearVelocity(dx * dashSpeed, dy * dashSpeed)
-    self.dashcooldown = 2.5
+    self.dashcooldown = 2.5 - (self.dashCDReduction)
     self.starbouncePSystem:setPosition(self.body:getX(), self.body:getY())
     self.starbouncePSystem:emit(10)
 end
@@ -340,8 +379,58 @@ function Player:wallbounce(force)
     end
 end
 
+function Player:resetDoubleJumps()
+    
+    local cx = self.body:getX() - 20
+    local cy = self.body:getY()
+    local targetY = cy + 35
+    local standingOnGround = false
+
+    for i = 1, 5 do
+        local newX = cx + (i - 1) * 10
+
+        addDebugRay(newX, cy, newX, targetY, nil, nil, nil, nil, 0.05)
+
+        world:rayCast(newX, cy, newX, targetY, function(fixture, x, y, xn, yn, fraction)
+
+            if fixture == floorFixture then
+                standingOnGround = true
+                addDebugRay(newX, cy, newX, targetY, x, y, xn, yn, 1.2)
+                return 0
+            end
+
+            return 1
+        end)
+    end
+
+    targetY = cy + 30
+    cx = self.body:getX() - 10
+
+    for i = 1, 5 do
+        local newX = cx + (i - 1) * 5
+
+        addDebugRay(newX, cy, newX, targetY, nil, nil, nil, nil, 0.12)
+
+        world:rayCast(newX, cy, newX, targetY, function(fixture, x, y, xn, yn, fraction)
+
+            if fixture ~= self.fixture and not fixture:isSensor() then
+                standingOnGround = true
+                addDebugRay(newX, cy, newX, targetY, x, y, xn, yn, 1.2)
+                return 0
+            end
+
+            return 1
+        end)
+    end
+
+    if standingOnGround then
+        self.DoubleJumps = self.maxDoubleJumps
+    end
+end
+
 function Player:OffStageRespawn()
-    if self.body:getY()>800 or self.body:getX()>1266 or self.body:getX()<-200 then
+    local deathradius = 300
+    if self.body:getY()>800 or self.body:getX()>1066+deathradius or self.body:getX() < -deathradius then
 
         self:TakeDamage(1)
 
@@ -358,14 +447,18 @@ function Player:TakeDamage(amount)
         return
     end
 
+    self.redness = 1
+
     self.hpRefill = 3
-    self.hp = self.hp - 1
+    self.hp = self.hp - amount
+    AchievementData.damageTaken = AchievementData.damageTaken + amount
     self.invulnTimer = self.invulnDuration
     self.damageParticleDelay = self.damageParticleDelayDuration
     self.hurtShakeTime = 0.12
-    
+    self.sfx_dmg:clone():play()
+
     if self.hp <= 0 then
-        love.event.quit()  ------------------------------------------------------ death event
+        GAMEOVER = true  ------------------------------------------------------ death event
     end
     
 end
@@ -379,9 +472,9 @@ function Player:takeBarDamage(amount)
     end
 
     self.hpBar = math.max(0, self.hpBar - amount)
+    AchievementData.chipDamageTaken = AchievementData.chipDamageTaken + amount
     self.backupinvulntimer = self.backupinvulnduration
     self.hurtShakeTime = 0.12
-    self.hpRefill = 2
 
     if self.hpBar <= 0 then
 
@@ -390,7 +483,6 @@ function Player:takeBarDamage(amount)
         self.damageParticleDelay = self.damageParticleDelayDuration
         self.hpBar = self.hpBarMax
 
-        self.sfx_dmg:clone():play()
     else
         self.sfx_chipdmg:clone():play()
     end
@@ -398,9 +490,15 @@ function Player:takeBarDamage(amount)
     local x,y = self.body:getPosition()
     self:spawndmgnum(amount,3,x+20,y-20,1,1)
     
+    if self.hp <= 0 then
+        GAMEOVER = true  ------------------------------------------------------ death event
+    end
 end
 
 function Player:control(up, down, left, right, dash, force)                        -------------------------------------------- player control
+
+    oldForce = force
+    force = force * self.fixture:getDensity()
 
     if love.keyboard.isDown(up) or love.keyboard.isDown(down) or love.keyboard.isDown(left) or love.keyboard.isDown(right) or love.keyboard.isDown(dash) then
         self.moving = true
@@ -418,7 +516,7 @@ function Player:control(up, down, left, right, dash, force)                     
     end
 
     if love.keyboard.isDown(left) then
-        self.body:applyForce(0 - force, 0)
+        self.body:applyForce(-force, 0)
         self.body:applyAngularImpulse(-25,0)
     end
 
@@ -428,8 +526,8 @@ function Player:control(up, down, left, right, dash, force)                     
     end
 
     if love.keyboard.isDown(up) and self.canJump then
-        self:wallbounce(force)
-        self:jump(force)
+        self:wallbounce(oldForce)
+        self:jump(oldForce)
     end
 
     if love.keyboard.isDown(down) then
@@ -450,7 +548,7 @@ function Player:control(up, down, left, right, dash, force)                     
         if love.keyboard.isDown("s") or love.keyboard.isDown("down") then
             dy = dy + 1
         end
-        self:dash(dx,dy,force)
+        self:dash(dx,dy,oldForce)
     end
 end
 
@@ -475,6 +573,43 @@ function Player:QueueHeal(H,giveInvuln,recoverBar)
 end
 
 function Player:update(dt)                                                     --------------------------------------------------- Player Update
+
+    local extraJumps = 0
+    local extraDensity = 0
+    local lessDashCD = 0
+    for _, upgrade in ipairs(RoundData.upgradesActive) do
+        if upgrade == "DoubleJump" then
+            extraJumps = extraJumps + 1
+        end
+        if upgrade == "DoubleJump2" then
+            extraJumps = extraJumps + 1
+        end
+        if upgrade == "DensityUp" then
+            extraDensity = extraDensity + 0.5
+        end
+        if upgrade == "DensityUp2" then
+            extraDensity = extraDensity + 0.5
+        end
+        if upgrade == "DashCDDown" then
+            lessDashCD = lessDashCD + 0.55
+        end
+        if upgrade == "DashCDDown2" then
+            lessDashCD = lessDashCD + 0.55
+        end
+    end
+
+    self.redness = math.min(1,math.max(0,self.redness - dt))
+
+    local targetDensity = 1 + extraDensity
+    local currentDensity = self.fixture:getDensity()
+    if currentDensity ~= targetDensity then
+        self.fixture:setDensity(targetDensity)
+        self.body:resetMassData()
+    end
+
+    self.maxDoubleJumps = extraJumps
+    self:resetDoubleJumps()
+    self.dashCDReduction = lessDashCD
 
     if self.dashcooldown > 0 then
         self.dashcooldown = math.max(0, self.dashcooldown - dt)
@@ -521,6 +656,7 @@ function Player:update(dt)                                                     -
     end
 
     self.pSystem:update(dt)
+    self.pSystem2:update(dt)
     self.damagePSystem:update(dt)
     self.starbouncePSystem:update(dt)
 
@@ -660,6 +796,13 @@ function Player:spawndmgnum(num,lifetime,x,spawnY,sx,sy)
         bounces = 3,
         bouncy = 1,
     })
+end
+
+function Player:GG()
+    if self.body and not self.body:isDestroyed() then
+        self.body:destroy()
+        self.body = nil
+    end
 end
 
 return Player

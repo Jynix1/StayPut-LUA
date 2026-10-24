@@ -269,7 +269,7 @@ function object:new(x, y, obj)
     end
 
     if obj == "cannon" then
-        instance.lifetime = 10*(RoundData.difficultyTBO/3)
+        instance.lifetime = math.min(8,math.max(5,15*(RoundData.difficultyTBO/3)))
 
         instance.radius= 42
         instance.newBody = love.physics.newBody(world,x,y,"dynamic")

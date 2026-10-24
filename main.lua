@@ -80,48 +80,56 @@ EnemyOptions = {
 		title = "Box",
 		desc = "A heavy box. Appears in random sizes, Falls to get in your way.",
 		cd = -RoundData.difficultyTBO / 3,
+		lvl = 0
 	},
 	{ 
 		id = "follower",
 		title = "Follower",
 		desc = "Follows and pushes the player.",
 		cd = 0,
+		lvl = 0
 	},
 	{
 		id = "bomb",
 		title = "Bomb",
 		desc = "Weak object, explodes with projectiles in all directions.",
 		cd = RoundData.difficultyTBO * 0.15,
+		lvl = 0
 	},
 	{
 		id = "zip",
 		title = "Zip",
 		desc = "A quick and strong object that dashes toward the player multiple times.",
 		cd = RoundData.difficultyTBO * 0.35,
+		lvl = 5
 	},
 	{
 		id = "tripwire",
 		title = "Stopwire",
 		desc = "A weak and light object that watches your movement, sit still for a moment to avoid getting hurt.",
 		cd = -RoundData.difficultyTBO / 3,
+		lvl = 5
 	},
 	{
 		id = "musicbox",
 		title = "Music Box",
 		desc = "A familiar object that slows down the player as they come near.",
 		cd = RoundData.difficultyTBO * 0.1,
+		lvl = 5
 	},
 	{
 		id = "tripmine",
 		title = "Tripmine",
 		desc = "Touching this small and light object will deal 75 chip damage. The corners are safe.",
 		cd = 0,
+		lvl = 0
 	},
 	{
 		id = "cannon",
 		title = "Cannon",
 		desc = "A floating weapon that fires strong projectiles at the player.",
 		cd = RoundData.difficultyTBO * 0.5,
+		lvl = 5
 	}
 }
 
@@ -179,15 +187,18 @@ local UpgradeChoiceButtons = {
 local function refreshChoiceButtons()
 	local pool = {}
 	for i, option in ipairs(EnemyOptions) do
-		local alreadyingame = false
+		local invalid = false
 
 		for _, activeId in ipairs(RoundData.enemiesActive) do
 			if option.id == activeId then
-				alreadyingame = true
+				invalid = true
 			end
 		end
+		if option.lvl > RoundData.level then
+			invalid = true
+		end
 
-		if not alreadyingame then
+		if not invalid then
 			table.insert(pool, option)
 		end
 	end
@@ -737,15 +748,17 @@ function love.update(dt) --                                                     
 				RoundData.level = RoundData.level + 1
 				RoundData.starttime = RoundData.starttime + 3
 				RoundData.time = RoundData.starttime
-				RoundData.difficultyTBO = RoundData.difficultyTBO - 0.1
+				RoundData.difficultyTBO = RoundData.difficultyTBO - 0.2
 				updateDiscordPresence()
 
 				if RoundData.level % 10 == 0 and RoundData.level ~= 0 then
 					RoundData.upgradePicker = true
 					refreshUpgradeChoiceButtons()
-				else
+				elseif RoundData.level % 2 == 0 or RoundData.level == 1 then
 					RoundData.enemyPicker = true
 					refreshChoiceButtons()
+				else
+					RoundData.ongoing = true
 				end
 
 				player:QueueHeal(2, 4, 50)
@@ -871,6 +884,7 @@ function drawGame()
 		proj:draw()
 	end
 
+	love.graphics.setColor(1,1,1,1)
 	love.graphics.draw(clickParticleSystem)
 
 	player:draw() -- drawing one player
@@ -1311,6 +1325,29 @@ function drawPlayerUI()
 			love.graphics.setColor(1,1,1,0.5)
 			love.graphics.printf(dur,x+10,y+15,width,"left")
 			y = y + 50
+		end
+	end
+
+	if love.keyboard.isDown("tab") and next(RoundData.enemiesActive) ~= nil then
+		local x,y,w,h = 533,300,600,400
+		love.graphics.setColor(0,0,0,0.5)
+		love.graphics.rectangle("fill",x - w/2, y - h/2, w,h)
+		love.graphics.setColor(1,0,0,1)
+		love.graphics.rectangle("line",x - w/2, y - h/2, w*1.1,h*1.1)
+		for _, item in ipairs(RoundData.enemiesActive) do
+			local id = item
+			local title
+			for _, item in ipairs(EnemyOptions) do
+				if id == item.id then
+					title = item.title
+				end
+			end
+			love.graphics.setColor(1,1,1,1)
+			love.graphics.printf(title,(x+15)-w/2,(y+20)-h/2,w,"left")
+
+			y = y+35
+
+			-- when adding more objects itll eventually go under the window, so make it go to the other side
 		end
 	end
 

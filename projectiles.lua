@@ -70,8 +70,8 @@ function Projectile.new(world, x, y, direction, type)
     end
 
     if type == "cannonball" then
-        self.speed = 425
-        self.damage = 25
+        self.speed = 585
+        self.damage = 35
         self.lifetime = 10
         self.shape = "circle"
         self.radius = 25
@@ -84,11 +84,14 @@ function Projectile.new(world, x, y, direction, type)
 
         self.drop = 0
         self.canKB = true
+        self.timepassed = 0
 
         self.draw = function ()
+            local rand = love.math.random(5, 16)
+            love.graphics.setLineWidth(rand)
             love.graphics.setColor(0.4, 0.4, 0.4,0.5)
-            love.graphics.circle("fill", self.body:getX(), self.body:getY(), self.radius+5)
-            love.graphics.setColor(0.1, 0.1, 0.1)
+            love.graphics.circle("line", self.body:getX(), self.body:getY(), self.radius+5)
+            love.graphics.setColor(0.05, 0.05, 0.05)
             love.graphics.circle("fill", self.body:getX(), self.body:getY(), self.radius)
         end
 
@@ -105,9 +108,12 @@ function Projectile:update(dt)
     local dx = player.body:getX() - self.body:getX()
     local dy = player.body:getY() - self.body:getY()
     local distance = math.sqrt(dx * dx + dy * dy)
+    if self.timepassed then self.timepassed = self.timepassed + dt end
 
     if self.drop then 
-        self.drop = self.drop + dt*0.5
+        if self.timepassed > 0.4 then
+            self.drop = self.drop + dt*3
+        end
         self.body:setPosition(self.body:getX(), self.body:getY() + self.drop)
     end
 
@@ -134,6 +140,9 @@ function Projectile:update(dt)
 end
 
 function Projectile:onHitPlayer()
+
+    local noplayerinvuln = player.invulnTimer <= 0 and player.backupinvulntimer <= 0
+
     player:takeBarDamage(self.damage)
     self.hasHit = true
 
@@ -143,13 +152,19 @@ function Projectile:onHitPlayer()
         local dx = px - bx
         local dy = py - by
         local distance = math.sqrt(dx * dx + dy * dy)
+        table.insert(player.statusEffects, { id = "slowness", name = "Slowness", duration = 0.35, level = 3 })
+        table.insert(player.statusEffects, { id = "slowness", name = "Slowness", duration = 3, level = 3 })
 
         if distance > 0 then
-            local KBforce = 500
+            local KBforce = 625
             local KBx = (dx / distance) * KBforce
             local KBy = (dy / distance) * KBforce
             player.body:applyLinearImpulse(KBx, KBy)
         end
+    end
+
+    if self.type == "bullet" and noplayerinvuln then
+        table.insert(player.statusEffects,{ id = "vulnerable", name = "Vulnerable", duration = 8, level = 1 })
     end
 end
 

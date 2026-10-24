@@ -29,11 +29,18 @@ function Player.new(world, x, y)
 
     instance.statusEffects = {}
 
+    --[[ instance.statusEffects = {
+    { id = "slowness", name = "Slowness", duration = 5, level = 2 },
+    }
+
+    example
+    ]]
+
     instance.hpRefill = 0
     instance.healQueue = 0
     instance.barHealQueue = 0
     instance.healTime = 0
-    instance.barHealTime = 0
+    instance.barHealTime = 0 
 
     instance.body = love.physics.newBody(world, x, y, "dynamic")
     instance.shape = love.physics.newCircleShape(25)
@@ -58,6 +65,12 @@ function Player.new(world, x, y)
     instance.sfx_chipdmg:setPitch(0.25)
 
     instance.sfx_dmg = love.audio.newSource("sounds/sfx/hurt.mp3","static")
+    instance.dashsfx = love.audio.newSource("sounds/sfx/dash.mp3","static")
+    instance.dashsfx:setPitch(1.1)
+    instance.dashsfx:setVolume(0.4)
+
+    instance.doublejumpsfx = love.audio.newSource("sounds/sfx/doublejump.mp3","static")
+    instance.doublejumpsfx:setVolume(0.2 )
 
     instance.canJump = true
     instance.dashcolor = false
@@ -304,6 +317,7 @@ function Player:jump(force)
             self.body:setLinearVelocity(vx, -force*1.2)
             self.DoubleJumps = self.DoubleJumps - 1
             self.canJump = false
+            self.doublejumpsfx:clone():play()
 
             self.pSystem2:setPosition(cx+15, cy+25)
             self.pSystem2:emit(30)
@@ -316,9 +330,11 @@ function Player:dash(dx, dy, force)
         return
     end
 
+    local vx, vy = self.body:getLinearVelocity()
+
     if dx == 0 and dy == 0 then
         -- fallback to current movement direction
-        local vx, vy = self.body:getLinearVelocity()
+        
         dx, dy = vx, vy
         if dx == 0 and dy == 0 then
             return
@@ -330,7 +346,8 @@ function Player:dash(dx, dy, force)
     dy = dy / length
 
     local dashSpeed = force * 1.8
-    self.body:setLinearVelocity(dx * dashSpeed, dy * dashSpeed)
+    self.dashsfx:clone():play()
+    self.body:setLinearVelocity((vx/2) + dx * dashSpeed,(vy/2) + dy * dashSpeed)
     self.dashcooldown = 2.5 - (self.dashCDReduction)
     self.starbouncePSystem:setPosition(self.body:getX(), self.body:getY())
     self.starbouncePSystem:emit(10)
@@ -471,7 +488,16 @@ function Player:takeBarDamage(amount)
         return
     end
 
-    self.hpBar = math.max(0, self.hpBar - amount)
+    local vulnerable = 0
+    for _, effect in ipairs(self.statusEffects) do
+        if effect.id == "vulnerable" then
+            vulnerable = vulnerable + effect.level
+        end
+    end
+
+    local finalamount = amount * (1 + vulnerable/10)
+
+    self.hpBar = math.max(0, self.hpBar - finalamount)
     AchievementData.chipDamageTaken = AchievementData.chipDamageTaken + amount
     self.backupinvulntimer = self.backupinvulnduration
     self.hurtShakeTime = 0.12
@@ -488,7 +514,7 @@ function Player:takeBarDamage(amount)
     end
 
     local x,y = self.body:getPosition()
-    self:spawndmgnum(amount,3,x+20,y-20,1,1)
+    self:spawndmgnum(finalamount,3,x+20,y-20,1,1)
     
     if self.hp <= 0 then
         GAMEOVER = true  ------------------------------------------------------ death event
@@ -497,8 +523,15 @@ end
 
 function Player:control(up, down, left, right, dash, force)                        -------------------------------------------- player control
 
+    local slowness = 0
+    for _, effect in ipairs(self.statusEffects) do
+        if effect.id == "slowness" then
+            slowness = slowness + effect.level
+        end
+    end
+
     oldForce = force
-    force = force * self.fixture:getDensity()
+    force = math.max(0,(force * self.fixture:getDensity()) * (1 - slowness/10))
 
     if love.keyboard.isDown(up) or love.keyboard.isDown(down) or love.keyboard.isDown(left) or love.keyboard.isDown(right) or love.keyboard.isDown(dash) then
         self.moving = true
@@ -659,6 +692,16 @@ function Player:update(dt)                                                     -
     self.pSystem2:update(dt)
     self.damagePSystem:update(dt)
     self.starbouncePSystem:update(dt)
+
+    if next(self.statusEffects) ~= nil then
+        for i = #self.statusEffects, 1, -1 do
+            local effect = self.statusEffects[i]
+            effect.duration = effect.duration - dt
+            if effect.duration < 0 then
+                table.remove(self.statusEffects,i)
+            end
+        end
+    end
 
     local now = love.timer.getTime()
     for i = #debugRays, 1, -1 do

@@ -117,6 +117,12 @@ EnemyOptions = {
 		desc = "Touching this small and light object will deal 75 chip damage. The corners are safe.",
 		cd = 0,
 	},
+	{
+		id = "cannon",
+		title = "Cannon",
+		desc = "A floating weapon that fires strong projectiles at the player.",
+		cd = RoundData.difficultyTBO * 0.5,
+	}
 }
 
 UpgradeOptions = {
@@ -1282,10 +1288,31 @@ function drawPlayerUI()
 	love.graphics.setColor(1, 1, 1, 1)
 	love.graphics.print(tostring(math.floor(hpBar)) .. "%", barX - 2 + barW + 12, barY - 6)
 
-	font = love.graphics.newFont("fonts/tiny5.ttf", 32)
-	love.graphics.setFont(font)
+	local font2 = love.graphics.newFont("fonts/tiny5.ttf", 32)
+	love.graphics.setFont(font2)
 
 	love.graphics.print("HP: " .. (self.hp or 0) .. "/" .. (self.maxHP or 4), 35, 10)
+
+	-- -- -- -- Status Effects
+	if next(player.statusEffects) ~= nil then
+		local x,y = 10,200
+		local width,height = 150,50
+		
+		for _, effect in ipairs(player.statusEffects) do
+			love.graphics.setColor(0,0,0,0.5)
+			love.graphics.rectangle("fill",x,y,width,height)
+
+			love.graphics.setFont(font)
+			love.graphics.setColor(1,1,1,0.75)
+			love.graphics.printf(effect.name.." "..effect.level,x+10,y, width,"left")
+
+			local dur = string.format("%.2f",effect.duration)
+			love.graphics.setFont(font2)
+			love.graphics.setColor(1,1,1,0.5)
+			love.graphics.printf(dur,x+10,y+15,width,"left")
+			y = y + 50
+		end
+	end
 
 	love.graphics.pop()
 end

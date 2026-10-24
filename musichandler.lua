@@ -7,6 +7,10 @@ local Music = {
     --["intermission"] = "sounds/music/intermission.mp3",
     ["1-10"] = love.audio.newSource("sounds/mus/1-10.mp3", "stream"),
 }
+local pausedAt = nil
+
+Music["1-10"]:setLooping(true)
+
 local function play()
     for name, music in pairs(Music) do
         if name ~= MusicData.current then
@@ -25,9 +29,14 @@ local function play()
     if shouldPlay then
         music:setPitch(MusicData.pitch)
         if not music:isPlaying() then
+            if pausedAt ~= nil then
+                music:seek(pausedAt, "seconds")
+                pausedAt = nil
+            end
             music:play()
         end
     elseif music:isPlaying() then
+        pausedAt = music:tell("seconds")
         music:pause()
     end
 end
@@ -45,4 +54,5 @@ end
 
 return {
     update = update,
+    MusicData = MusicData,
 }

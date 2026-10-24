@@ -123,8 +123,10 @@ function object:new(x, y, obj)
         instance.newBody:setLinearDamping(3)
 
         instance.warnsfx = love.audio.newSource("sounds/sfx/zip/swingwarn.mp3", "static")
+        instance.warnsfx:setVolume(0.5)
         instance.sfx = love.audio.newSource("sounds/sfx/zip/swing.mp3", "static")
         instance.sfx:setPitch(0.5)
+        instance.sfx:setVolume(0.5)
     
         instance.spinVelocity = 0
         instance.dashTime = 1
@@ -269,13 +271,16 @@ function object:new(x, y, obj)
     if obj == "cannon" then
         instance.lifetime = 10*(RoundData.difficultyTBO/3)
 
-        instance.radius= 40
+        instance.radius= 42
         instance.newBody = love.physics.newBody(world,x,y,"dynamic")
         instance.shape = love.physics.newCircleShape(instance.radius)
         instance.fixture = love.physics.newFixture(instance.newBody,instance.shape,1.2)
         instance.newBody:setGravityScale(0.4)
         instance.texture = love.graphics.newImage("sprites/cannon.png")
         instance.newBody:setLinearDamping(2)
+
+        instance.shootsfx = love.audio.newSource("sounds/sfx/bigshot.mp3","static")
+        instance.shootsfx:setVolume(0.4)
 
         instance.maxShootCD = 1.25
         instance.shootCD = 2
@@ -779,10 +784,12 @@ function object:update(dt)
         if self.shootCD <= 0 then
             local newProjectile = Projectile.new(world, spawnX, spawnY, angle, "cannonball")
             table.insert(projectiles, newProjectile)
+            
             self.shootCD = self.maxShootCD
+            self.shootsfx:clone():play()
         end
 
-        if cannonY > 200 then 
+        if cannonY > 115 then 
             self.newBody:applyLinearImpulse(0,-5)
         end
         self.newBody:applyLinearImpulse(dx*(dt*2),0)

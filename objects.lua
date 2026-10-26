@@ -258,6 +258,8 @@ function object:new(x, y, obj)
         instance.smolparticle:setLinearAcceleration(0,-200)
         instance.smolparticle:setLinearDamping(2)
 
+        instance.harmless = 1
+
         instance.spawn = love.audio.newSource("sounds/sfx/tripmine/spawn.mp3","static")
         instance.boom = love.audio.newSource("sounds/sfx/tripmine/boom.mp3","static")
         instance.boom:setVolume(0.6)
@@ -285,6 +287,27 @@ function object:new(x, y, obj)
         instance.maxShootCD = 1.25
         instance.shootCD = 2
     
+    end
+
+    if obj == "popper" then
+        instance.lifetime = 9-(3 - math.max(0,RoundData.difficultyTBO))
+
+        instance.size = 105
+        local s = instance.size
+        instance.newBody = love.physics.newBody(world,x,y,"dynamic")
+        instance.shape = love.physics.newPolygonShape(s/2,s/2,s/2,-s/2,-s/2,0)
+        instance.fixture = love.physics.newFixture(instance.newBody,instance.shape,1)
+
+        instance.texture = love.graphics.newImage("sprites/popper.png")
+        instance.newBody:setGravityScale(0.4)
+        instance.newBody:setLinearDamping(1.5)
+
+        instance.popsfx = love.audio.newSource("sounds/sfx/poof.mp3", "static")
+        instance.popsfx:setPitch(0.5)
+        instance.popCDmax = 1.85
+        instance.popCD = 2.5
+
+        self.targetX = 0
     end
 
     instance.fixture:setUserData({ type = instance.obj, owner = instance })
@@ -426,7 +449,7 @@ function object:draw() ----------------                                         
         love.graphics.setColor(1,1,1,1)
         love.graphics.draw(self.explodep,0,0)
         love.graphics.draw(self.smolparticle,0,0)
-        love.graphics.setColor(1,1,1,alpha)
+        love.graphics.setColor(1,1,1,alpha-self.harmless*2)
 
         local x,y = self.newBody:getPosition()
         local tW,tH = self.texture:getDimensions()
@@ -447,6 +470,15 @@ function object:draw() ----------------                                         
         local r = self.newBody:getAngle()
 
         love.graphics.draw(self.texture,x,y,r,sX,sY,600/2,600/2)
+    elseif self.obj == "popper" then
+        love.graphics.setColor(1,1,1,alpha)
+        local tW,tH = 500,500
+        local x,y = self.newBody:getPosition()
+        local sX = self.size/tW
+        local sY = self.size/tH
+        local r = self.newBody:getAngle()
+
+        love.graphics.draw(self.texture,x,y,r,sX,sY,500/2,500/2)
     end
 end
 
@@ -534,7 +566,7 @@ function object:update(dt)
         local distance = math.sqrt(dx * dx + dy * dy)
 
         if distance > 0 then
-            local forceMagnitude = 400
+            local forceMagnitude = 300
             local forceX = (dx / distance) * forceMagnitude
             local forceY = (dy / distance) * forceMagnitude
 
@@ -755,9 +787,12 @@ function object:update(dt)
 
         local triggerDistance = 50
 
-        if dx * dx + dy * dy <= triggerDistance * triggerDistance and self.halfdead == false then
+        if self.harmless > 0 then self.harmless = self.harmless - dt end
+
+        if dx * dx + dy * dy <= triggerDistance * triggerDistance and self.halfdead == false and self.harmless <= 0 then
             self.boom:clone():play()
             player:takeBarDamage(75)
+            table.insert(player.statusEffects,{ id = "slowness", name = "Slowness", duration = 0.5, level = 5 })
             self.lifetime = 1
             self.halfdead = true
             if self.fixture then self.fixture:setSensor(true) end
@@ -799,6 +834,45 @@ function object:update(dt)
         if cannonX > 1066 then
             self.newBody:applyLinearImpulse(-20,0)
         end
+    end
+
+    if self.obj == "popper" then
+        local pX, pY = self.newBody:getPosition()
+        local playerX, playerY = player.body:getPosition()
+        local vx,vy = self.newBody:getLinearVelocity()
+        local dx = playerX - pX
+        local dy = playerY - pY
+        local angle = math.atan2(dy, dx)
+
+        self.newBody:setAngle(angle)
+
+        self.targetX = playerX + math.cos(love.timer.getTime()*1)*300
+
+        if pX ~= self.targetX then
+            if pX < self.targetX then
+                self.newBody:applyLinearImpulse(400*dt,0)
+            end
+            if pX > self.targetX then
+                self.newBody:applyLinearImpulse(-400*dt,0)
+            end
+        end
+        if pY > 115 then
+            self.newBody:applyLinearImpulse(0,-4)
+        end
+
+        self.popCD = self.popCD - dt
+        if self.popCD <= 0 then
+            local shots = 16
+            for i = 1, shots do
+                local difference = (math.pi/3)/shots
+                local applied = (angle - (difference*shots)/2) + difference*i
+                local newProjectile = Projectile.new(world, pX, pY, applied, "pop")
+                table.insert(projectiles, newProjectile)
+            end
+            self.popCD = self.popCDmax
+            self.popsfx:clone():play()
+        end
+
     end
 end
 

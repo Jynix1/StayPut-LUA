@@ -13,11 +13,11 @@ function Projectile.new(world, x, y, direction, type)
         self.speed = 275
         self.damage = 30
         self.lifetime = 6
-        self.shape = "circle"
         self.radius = 11
+        self.shape = love.physics.newCircleShape(self.radius)
         
         self.body = love.physics.newBody(world, x, y, "kinematic")
-        self.fixture = love.physics.newFixture(self.body, love.physics.newCircleShape(self.radius), 1)
+        self.fixture = love.physics.newFixture(self.body, self.shape, 1)
         self.fixture:setUserData({ type = "projectile", owner = self })
         self.fixture:setSensor(true)
         self.dieonplayerhit = true
@@ -50,11 +50,11 @@ function Projectile.new(world, x, y, direction, type)
         self.speed = 150
         self.damage = 50
         self.lifetime = 8
-        self.shape = "circle"
         self.radius = 35
+        self.shape = love.physics.newCircleShape(self.radius)
         
         self.body = love.physics.newBody(world, x, y, "kinematic")
-        self.fixture = love.physics.newFixture(self.body, love.physics.newCircleShape(self.radius), 1)
+        self.fixture = love.physics.newFixture(self.body, self.shape, 1)
         self.fixture:setUserData({ type = "projectile", owner = self })
         self.fixture:setSensor(true)
         self.dieonplayerhit = true
@@ -73,16 +73,17 @@ function Projectile.new(world, x, y, direction, type)
         self.speed = 585
         self.damage = 35
         self.lifetime = 10
-        self.shape = "circle"
         self.radius = 25
+        self.shape = love.physics.newCircleShape(self.radius)
         
         self.body = love.physics.newBody(world, x, y, "kinematic")
-        self.fixture = love.physics.newFixture(self.body, love.physics.newCircleShape(self.radius), 1)
+        self.fixture = love.physics.newFixture(self.body,self.shape, 1)
         self.fixture:setUserData({ type = "projectile", owner = self })
         self.fixture:setSensor(true)
         self.dieonplayerhit = false
 
         self.drop = 0
+        self.droprate = 3
         self.canKB = true
         self.timepassed = 0
 
@@ -93,6 +94,43 @@ function Projectile.new(world, x, y, direction, type)
             love.graphics.circle("line", self.body:getX(), self.body:getY(), self.radius+5)
             love.graphics.setColor(0.05, 0.05, 0.05)
             love.graphics.circle("fill", self.body:getX(), self.body:getY(), self.radius)
+        end
+
+        local vx = self.speed * math.cos(direction)
+        local vy = self.speed * math.sin(direction)
+        self.body:setLinearVelocity(vx, vy)
+    end
+
+    if type == "pop" then
+        local rand = love.math.random(300,480)
+        self.speed = rand
+        self.damage = 15
+        self.lifetime = 5
+        self.width,self.height = 25,13
+        self.radius = 15
+
+        self.shape = love.physics.newRectangleShape(self.width,self.height)
+        self.body = love.physics.newBody(world,x,y,"kinematic")
+        self.fixture = love.physics.newFixture(self.body,self.shape,1)
+        self.fixture:setSensor(true)
+        self.fixture:setUserData({ type = "projectile", owner = self })
+        self.dieonplayerhit = false
+        self.body:setAngularVelocity(6)
+
+        self.timepassed = 0.2 -- starts at later number so it drops earlier cuz im lazy
+        self.drop = 0
+        self.droprate = 6
+        self.hasHit = false
+
+        self.draw = function ()
+            local x,y = self.body:getPosition()
+            love.graphics.setColor(1,1,1,self.timepassed*2)
+
+            love.graphics.push()
+                love.graphics.translate(x,y)
+                love.graphics.rotate(self.body:getAngle())
+                love.graphics.rectangle("fill", -self.width / 2, -self.height / 2, self.width, self.height)
+            love.graphics.pop()
         end
 
         local vx = self.speed * math.cos(direction)
@@ -112,7 +150,7 @@ function Projectile:update(dt)
 
     if self.drop then 
         if self.timepassed > 0.4 then
-            self.drop = self.drop + dt*3
+            self.drop = self.drop + self.droprate*dt
         end
         self.body:setPosition(self.body:getX(), self.body:getY() + self.drop)
     end
@@ -126,8 +164,6 @@ function Projectile:update(dt)
     )
         self.afterimageParticles:update(dt)
     end
-
-
 
     if player and not self.hasHit then
         if distance < (15 + self.radius) then
@@ -172,7 +208,7 @@ function Projectile:draw()
     if self.type == "bullet" then
         love.graphics.draw(self.afterimageParticles)
     end
-    self:drawfunc()
+    self.drawfunc()
 end
 
 return Projectile

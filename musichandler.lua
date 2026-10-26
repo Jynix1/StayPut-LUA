@@ -5,11 +5,11 @@ MusicData = {
 
 local Music = {
     --["intermission"] = "sounds/music/intermission.mp3",
-    ["1-10"] = love.audio.newSource("sounds/mus/1-10.mp3", "stream"),
+    ["1-9"] = love.audio.newSource("sounds/mus/1-9.mp3", "stream"),
 }
 local pausedAt = nil
 
-Music["1-10"]:setLooping(true)
+Music["1-9"]:setLooping(true)
 
 local function play()
     for name, music in pairs(Music) do
@@ -43,16 +43,28 @@ end
 
 local function update(dt)
     if RoundData.ongoing then
-        if RoundData.level > 0 and RoundData.level < 11 then
-            if MusicData.current ~= "1-10" then
-                MusicData.current = "1-10"
+        if RoundData.level > 0 and RoundData.level < 10 then
+            if MusicData.current ~= "1-9" then
+                MusicData.current = "1-9"
             end
         end
     end
     play()
 end
 
+local function reset()
+    for _, music in pairs(Music) do
+        music:stop()
+        music:seek(0,"seconds")
+    end
+
+    MusicData.current = nil
+    MusicData.pitch = 1
+    pausedAt = nil
+end
+
 return {
     update = update,
     MusicData = MusicData,
+    reset = reset,
 }

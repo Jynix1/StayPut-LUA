@@ -350,7 +350,7 @@ function Player:dash(dx, dy, force)
     self.body:setLinearVelocity((vx/2) + dx * dashSpeed,(vy/2) + dy * dashSpeed)
     self.dashcooldown = 2.5 - (self.dashCDReduction)
     self.starbouncePSystem:setPosition(self.body:getX(), self.body:getY())
-    self.starbouncePSystem:emit(10)
+    self.starbouncePSystem:emit(5)
 end
 
 function Player:wallbounce(force)

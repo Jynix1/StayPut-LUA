@@ -1,5 +1,5 @@
--- StayPut. A passion project made to learn Lua and LÖVE2D.
--- Originating from a game made in TurboWarp/Scratch. This is a rewrite of the original game in Lua using the LÖVE2D framework.
+-- StayPut 2. A passion project made to learn Lua and LÖVE2D.
+-- Originating from a game made in TurboWarp/Scratch. This is a remake of the original game in Lua using the LÖVE2D framework.
 
 if os.getenv("LOVE2D_TOOLS") then
 	pcall(require, "_love2d_tools_bridge")
@@ -13,13 +13,12 @@ local lastEnemy = nil
 local discordrefreshTimer = 0
 
 local gameoverOptions = {
-	[1] = "NEW RUN",
-	[2] = "GIVE UP",
+	[1] = "RESTART EXPERIMENT",
+	[2] = "STOP PROGRAM",
+	[3] = "VIEW INFORMATION"
 }
-local youblur = love.graphics.newImage("sprites/youblur.png")
 local gameoverSelected = 0
 local gameoverTimeAt = nil
-local cx
 local greenFlashAlpha = 0
 
 local quitCount = 0
@@ -50,6 +49,16 @@ clickParticleSystem:setLinearAcceleration(0,300)
 keybind_WIP_timer = 0
 keybind_toBeEdited = nil
 editingMasterVolume = false
+
+local clickfx = love.graphics.newCanvas(240,200)
+clickfx:renderTo(function ()
+	love.graphics.rectangle("fill",0,0,240,200)
+end)
+local clickfxSquareSystem = love.graphics.newParticleSystem(clickfx)
+clickfxSquareSystem:setSizes(1,0)
+clickfxSquareSystem:setParticleLifetime(0.4)
+clickfxSquareSystem:setSpeed(0)
+clickfxSquareSystem:setColors(1,0,0,1,1,0,0,0)
 
 RoundData = {
 
@@ -130,6 +139,13 @@ EnemyOptions = {
 		desc = "A floating weapon that fires strong projectiles at the player.",
 		cd = RoundData.difficultyTBO * 0.5,
 		lvl = 5
+	},
+	{
+		id = "popper",
+		title = "Popper",
+		desc = "Releases dangerous mid-ranged confetti toward the player.",
+		cd = RoundData.difficultyTBO * 0.5,
+		lvl = 5,
 	}
 }
 
@@ -165,11 +181,11 @@ UpgradeOptions = {
 		desc = "-0.55s Dash Cooldown\n\nReduces the cooldown of your dash.",
 	}
 }
-
+-- starter enemies possibly
 OffensiveEnemies = {
 	{ id = "follower" },
 	{ id = "bomb" },
-	{ id = "zip" },
+	{ id = "tripmine" },
 }
 
 local ChoiceButtons = {
@@ -272,6 +288,7 @@ local function refreshUpgradeChoiceButtons()
 end
 
 objects = {}
+
 local spawnHold = {} --                                         -----------------------  Dev utility to spawn stuff
 local spawnHoldDelay = 0.75 --
 local spawnHoldRepeatInterval = 0.01 --
@@ -283,7 +300,8 @@ local spawnKeyConfig = { --
 	["5"] = "zip",
 	["6"] = "musicbox",
 	["7"] = "tripmine",
-	["8"] = "cannon"
+	["8"] = "cannon",
+	["9"] = "popper",
 }
 
 local Menu = require("menu")
@@ -353,6 +371,7 @@ function love.load()
 	floorFixture:setFriction(1)
 
 	GAMEOVER = false
+	gameoverInfoShown = false
 
 	errorSound = love.audio.newSource("sounds/sfx/error.mp3", "static")
 	movemenuSound = love.audio.newSource("sounds/sfx/move.mp3", "static")
@@ -363,6 +382,8 @@ function love.load()
 	selectSound:setVolume(0.8)
 	equipSound = love.audio.newSource("sounds/sfx/equip.mp3", "static")
 	sfx_crit = love.audio.newSource("sounds/sfx/crit.mp3", "static")
+	selectbadSound = love.audio.newSource("sounds/sfx/selectbad.mp3","static")
+	selectbadSound:setVolume(0.75)
 
 	barRecoverSound = love.audio.newSource("sounds/sfx/barheal.mp3", "static")
 	barRecoverSound:setPitch(1.3)
@@ -408,6 +429,7 @@ function love.load()
 	tobyfont = love.graphics.newFont("fonts/toby.otf", 32)
 	toby2font = love.graphics.newFont("fonts/toby.otf", 16)
 	smalltobyfont = love.graphics.newFont("fonts/toby.otf", 24)
+	consolefont = love.graphics.newFont("fonts/console.ttf",24)
 
 	function beginContact(a, b, contact)
 		local dataA = a:getUserData()
@@ -568,7 +590,11 @@ function love.update(dt) --                                                     
 		quitCount = 0
 	end
 
-	if gameRunning then updateBG(dt) clickParticleSystem:update(dt) end
+	if gameRunning then
+		updateBG(dt)
+		clickParticleSystem:update(dt)
+		clickfxSquareSystem:update(dt)
+	end
 
 	love.audio.setVolume(MasterVolume)
 
@@ -645,8 +671,7 @@ function love.update(dt) --                                                     
 				RoundData.enemyPicker = false
 				RoundData.upgradePicker = false
 				RoundData.ongoing = true
-				Musichandler.MusicData.current = nil
-				Musichandler.MusicData.pitch = 1
+				Musichandler:reset()
 				if gameoverTimeAt == nil then
 					gameoverTimeAt = love.timer.getTime()
 					sfx_crit:clone():play()
@@ -885,6 +910,7 @@ function drawGame()
 	end
 
 	love.graphics.setColor(1,1,1,1)
+	love.graphics.draw(clickfxSquareSystem)
 	love.graphics.draw(clickParticleSystem)
 
 	player:draw() -- drawing one player
@@ -1077,12 +1103,20 @@ function love.keypressed(key)
 			elapsed = (love.timer.getTime() - gameoverTimeAt)
 		end
 
-		if GAMEOVER and (key == "a" or key == "left") and elapsed > 3 then
-			gameoverSelected = 1
+		if GAMEOVER and (key == "w" or key == "up") and elapsed > 3 then
+			if gameoverSelected == 0 then
+				gameoverSelected = 1
+			end
+			gameoverSelected = gameoverSelected -1
+			if gameoverSelected < 1 then gameoverSelected = #gameoverOptions end
 		end
 
-		if GAMEOVER and (key == "d" or key == "right") and elapsed > 3 then
-			gameoverSelected = 2
+		if GAMEOVER and (key == "s" or key == "down") and elapsed > 3 then
+			if gameoverSelected == 0 then
+				gameoverSelected = 1
+			end
+			gameoverSelected = gameoverSelected +1
+			if gameoverSelected > #gameoverOptions then gameoverSelected = 1 end
 		end
 
 		if GAMEOVER and (key == "z" or key == "return") then
@@ -1092,6 +1126,11 @@ function love.keypressed(key)
 
 			if gameoverSelected == 2 then
 				love.event.quit()
+			end
+
+			if gameoverSelected == 3 then
+				gameoverInfoShown = true
+				selectSound:clone():play()
 			end
 		end
 		if key == "0" then --dev key
@@ -1135,7 +1174,10 @@ function love.mousepressed(mx, my, button)
 					RoundData.enemyPicker = false
 					RoundData.ongoing = true
 					clickParticleSystem:setPosition(newx,newy)
-					clickParticleSystem:emit(10)
+					clickParticleSystem:emit(7)
+					clickfxSquareSystem:setPosition(btn.x+btn.width/2,btn.y+btn.height/2)
+					clickfxSquareSystem:emit(1)
+					selectbadSound:clone():play()
 					break
 				end
 			end
@@ -1221,6 +1263,7 @@ function resetGame()
 	IntroPlaying = true
 	IntroFrame = 1
 	GAMEOVER = false
+	gameoverInfoShown = false
 	IntroPlayedBefore = false
 	gameoverTimeAt = nil
 	gameoverSelected = 0
@@ -1333,7 +1376,7 @@ function drawPlayerUI()
 		love.graphics.setColor(0,0,0,0.5)
 		love.graphics.rectangle("fill",x - w/2, y - h/2, w,h)
 		love.graphics.setColor(1,0,0,1)
-		love.graphics.rectangle("line",x - w/2, y - h/2, w*1.1,h*1.1)
+		love.graphics.rectangle("line",x - w/2, y - h/2, w,h)
 		for _, item in ipairs(RoundData.enemiesActive) do
 			local id = item
 			local title
@@ -1417,43 +1460,74 @@ function drawGAMEOVER()
 	end
 
 	love.graphics.setColor(1, 1, 1, 1)
-
-	love.graphics.setFont(tobyfont)
+	local y = 75
+	love.graphics.setFont(consolefont)
+	love.graphics.print("THE PLAYER HAS REACHED AN END",50,y) love.graphics.setColor(1,0,0,0.4) love.graphics.print("[ERR 0x0001; HP IS ZERO]", 575,y)
+	y=y+35
+	love.graphics.setColor(1, 1, 1, 0.4)
+	love.graphics.print("-- SELECT AN OPTION BELOW",50,y)
+	y=y+150
 	for i, item in ipairs(gameoverOptions) do
-		local dist = 250
-		local totalSpan = (#gameoverOptions - 1) * dist
-		local startx = 533 - (totalSpan / 2)
-		local textwidth = tobyfont:getWidth(item)
-		local x = startx + (i - 1) * dist - (textwidth / 2)
-		local spread = (math.cos(love.timer.getTime()) * 4) + 1
-		local color1
-		local color2
+
+		--if this wasn't a comment then
+		--	 local dist = 250
+		--	 local totalSpan = (#gameoverOptions - 1) * dist
+		--	 local startx = 533 - (totalSpan / 2)
+		--	 local textwidth = tobyfont:getWidth(item)
+		--	 local x = startx + (i - 1) * dist - (textwidth / 2)
+		--	 local spread = (math.cos(love.timer.getTime()) * 4) + 1
+		--	 local color1
+		--	 local color2
+		--	 if gameoverSelected ~= i then
+		--	 	color1 = { 1, 1, 1, 0.25 }
+		--	 	color2 = { 1, 1, 1, 1 }
+		--	 else
+		--	 	color1 = { 1, 1, 0, 0.25 }
+		--	 	color2 = { 1, 1, 0, 1 }
+		--	 end
+		--	 if elapsed > 2 and gameoverSelected == i and gameoverSelected ~= 0 then
+		--	 	if cx == nil then
+		--	 		cx = 533
+		--	 	end
+		--	 	cx = cx + ((x + (tobyfont:getWidth(item) / 2) - cx) / 6)
+		--	 	love.graphics.draw(youblur, cx, 520, 0, 3, 3, youblur:getWidth() / 2, youblur:getHeight() / 2)
+		--	 elseif gameoverSelected == 0 then
+		--	 	love.graphics.draw(youblur, 533, 520, 0, 2, 2, youblur:getWidth() / 2, youblur:getHeight() / 2)
+		--	 end
+		--	 love.graphics.setColor(color1)
+		--	 love.graphics.print(item, x - spread, 500, 0, 1, 1)
+		--	 love.graphics.print(item, x + spread, 500, 0, 1, 1)
+		--	 love.graphics.print(item, x, 500 - spread, 0, 1, 1)
+		--	 love.graphics.print(item, x, 500 + spread, 0, 1, 1)
+		--	 love.graphics.setColor(color2)
+		--	 love.graphics.print(item, x, 500, 0, 1, 1)
+		--end
+
 		if gameoverSelected ~= i then
-			color1 = { 1, 1, 1, 0.25 }
-			color2 = { 1, 1, 1, 1 }
+			love.graphics.setColor(1,1,1,0.65)
+			love.graphics.print(item,80,y)
 		else
-			color1 = { 1, 1, 0, 0.25 }
-			color2 = { 1, 1, 0, 1 }
+			love.graphics.setColor(1,1,1,1)
+			love.graphics.print("> "..item,80,y)
 		end
-		if elapsed > 2 and gameoverSelected == i and gameoverSelected ~= 0 then
-			if cx == nil then
-				cx = 533
-			end
-			cx = cx + ((x + (tobyfont:getWidth(item) / 2) - cx) / 6)
-			love.graphics.draw(youblur, cx, 520, 0, 3, 3, youblur:getWidth() / 2, youblur:getHeight() / 2)
-		elseif gameoverSelected == 0 then
-			love.graphics.draw(youblur, 533, 520, 0, 2, 2, youblur:getWidth() / 2, youblur:getHeight() / 2)
-		end
-		love.graphics.setColor(color1)
-		love.graphics.print(item, x - spread, 500, 0, 1, 1)
-		love.graphics.print(item, x + spread, 500, 0, 1, 1)
-		love.graphics.print(item, x, 500 - spread, 0, 1, 1)
-		love.graphics.print(item, x, 500 + spread, 0, 1, 1)
-		love.graphics.setColor(color2)
-		love.graphics.print(item, x, 500, 0, 1, 1)
+		y = y + 35
+	end
+	y = 500
+	if gameoverInfoShown then
+		love.graphics.setColor(1,1,1,0.75)
+		
+		love.graphics.print("PLAYER RECIEVED "..AchievementData.chipDamageTaken.." CHIP DAMAGE", 75, y)
+		y=y-35
+		love.graphics.print("PLAYER RECIEVED "..AchievementData.damageTaken.." FULL HITS", 75, y)
+		y=y-35
+		love.graphics.print("PLAYER SURVIVED FOR "..math.floor(AchievementData.surviveTime).." SECONDS", 75, y)
+		y=y-35
+		love.graphics.print("PLAYER REACHED LEVEL "..math.floor(RoundData.level), 75, y)
 	end
 	love.graphics.setColor(rgb, rgb, rgb, alpha)
 	love.graphics.rectangle("fill", 0, 0, 1066, 800)
+	
+
 end
 
 function drawChoiceButtons()

@@ -5,7 +5,7 @@
 if os.getenv("LOVE2D_TOOLS") then
 	pcall(require, "_love2d_tools_bridge")
 end
-
+-- i hate git
 GAME_VER = "v0.1.0"
 
 local https = require("https")

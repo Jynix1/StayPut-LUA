@@ -15,5 +15,6 @@
   "Lua.diagnostics.globals": [
     "baller"
   ],
-  "stylua.targetReleaseVersion": "latest"
+  "stylua.targetReleaseVersion": "latest",
+  "pixelbyte.love2d.path": "\\love11.5\\love.exe"
 }

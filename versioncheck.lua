@@ -1,6 +1,8 @@
 local https = require("https")
 local json = require("lib/json")
 
+local gamever = ...
+
 local url = "https://api.github.com/repos/Jynix1/StayPut-LUA/releases/latest"
 local everythingOK, status, body = pcall(https.request, url, {
 	method = "GET",
@@ -33,9 +35,9 @@ end
 local decodeOK, data = pcall(json.decode, body)
 local latestVer = data.tag_name
 
-if latestVer ~= GAME_VER then
+if latestVer ~= "v"..gamever then
 	updStatus = "outdated"
-elseif latestVer == GAME_VER then
+elseif latestVer == "v"..gamever then
 	updStatus = "uptodate"
 end
 

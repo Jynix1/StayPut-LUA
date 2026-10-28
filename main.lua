@@ -6,7 +6,7 @@ if os.getenv("LOVE2D_TOOLS") then
 	pcall(require, "_love2d_tools_bridge")
 end
 
-GAME_VER = "v0.1.2"
+GAME_VER = "v0.1.3"
 
 local https = require("https")
 local json = require("lib/json")
@@ -555,7 +555,12 @@ local function drawBG(screenWidth, screenHeight)
 end
 
 local particleSpawnTimer = 0.1
+local bgParticleTime = 0
+
 local function updateBG(dt)
+	bgParticleTime = bgParticleTime + dt
+    local phase = bgParticleTime % (15 * math.pi)
+
 	for i = #backgroundElements, 1, -1 do
 		local element = backgroundElements[i]
 
@@ -575,13 +580,13 @@ local function updateBG(dt)
 	if particleSpawnTimer <= 0 then
 	for i = 1, 4 do
 		local dir,spread
-
+		
 		if RoundData.level < 10 then
-			dir,spread = math.rad(225),math.rad(math.cosh(love.timer.getTime()*1)*115)
+			dir,spread = math.rad(225),math.rad(math.cosh(phase)*115)
 		elseif RoundData.level < 20 then
-			dir,spread = math.rad(225),math.rad(math.cos(love.timer.getTime()*1)*115)
+			dir,spread = math.rad(225),math.rad(math.cos(phase)*115)
 		else
-			dir,spread = math.rad(225),math.rad(math.tan(love.timer.getTime()*1)*115)
+			dir,spread = math.rad(225),math.rad(math.tan(phase)*115)
 		end
 
 		local angle = dir + (i - 2.5) * (spread / 4)
@@ -1657,8 +1662,8 @@ function drawUpgradeChoiceButtons()
 end
 
 --[[ function checkVersion()
-		moved to new file
-	end]]
+	moved to new file
+end]]
 
 -- Update notification
 function drawUpdNotification(timeAlive)
@@ -1671,6 +1676,9 @@ function drawUpdNotification(timeAlive)
 	if UpdateStatus == "outdated" then
 		love.graphics.setColor(1,1,0.5+c,1-(timeAlive/10))
 		texttoshow = "Game version mismatch! Could be outdated. Download the latest release on the Repo."
+	elseif UpdateStatus == "uptodate" then
+		love.graphics.setColor(0.5+c,1,0.5+c,1-(timeAlive/10))
+		texttoshow = "Validated game version with GitHub. Up to date!"
 	else
 		love.graphics.setColor(1,0.5+c,0.5+c,1-(timeAlive/10))
 		texttoshow = UpdateStatus

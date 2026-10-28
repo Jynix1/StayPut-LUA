@@ -281,10 +281,22 @@ function object:new(x, y, obj)
         instance.texture = love.graphics.newImage("sprites/cannon.png")
         instance.newBody:setLinearDamping(2)
 
+        local canvas = love.graphics.newCanvas(80,80)
+        canvas:renderTo(function ()
+            love.graphics.circle("fill",40,40,40)
+        end)
+        instance.particlesSystem = love.graphics.newParticleSystem(canvas)
+        instance.particlesSystem:setParticleLifetime(2,2.5)
+        instance.particlesSystem:setSizes(0.4,0)
+        instance.particlesSystem:setLinearDamping(2.5)
+        instance.particlesSystem:setColors(0.35,0.35,0.35,1,0.35,0.35,0.35,0)
+        instance.particlesSystem:setSpread(math.pi/1.75)
+        instance.particlesSystem:setSpeed(450,700)
+
         instance.shootsfx = love.audio.newSource("sounds/sfx/bigshot.mp3","static")
         instance.shootsfx:setVolume(0.4)
 
-        instance.maxShootCD = 1.25
+        instance.maxShootCD = 1.65
         instance.shootCD = 2
     
     end
@@ -303,11 +315,24 @@ function object:new(x, y, obj)
         instance.newBody:setLinearDamping(1.5)
 
         instance.popsfx = love.audio.newSource("sounds/sfx/poof.mp3", "static")
-        instance.popsfx:setPitch(0.5)
-        instance.popCDmax = 1.85
+        instance.popsfx:setPitch(0.65)
+        instance.popsfx:setVolume(0.5)
+        instance.popCDmax = 1.9
         instance.popCD = 2.5
 
         self.targetX = 0
+
+        local canvas = love.graphics.newCanvas(20,20)
+        canvas:renderTo(function ()
+            love.graphics.circle("fill",10,10,10)
+        end)
+        instance.particlesSystem = love.graphics.newParticleSystem(canvas)
+        instance.particlesSystem:setParticleLifetime(1.75,2.25)
+        instance.particlesSystem:setSizes(0.5,0)
+        instance.particlesSystem:setLinearDamping(3)
+        instance.particlesSystem:setColors(0.5,0.5,0.5,1,0.5,0.5,0.5,0)
+        instance.particlesSystem:setSpread(math.pi/2)
+        instance.particlesSystem:setSpeed(600,675)
     end
 
     instance.fixture:setUserData({ type = instance.obj, owner = instance })
@@ -469,6 +494,7 @@ function object:draw() ----------------                                         
         local sY = d/tH
         local r = self.newBody:getAngle()
 
+        love.graphics.draw(self.particlesSystem,0,0)
         love.graphics.draw(self.texture,x,y,r,sX,sY,600/2,600/2)
     elseif self.obj == "popper" then
         love.graphics.setColor(1,1,1,alpha)
@@ -478,6 +504,7 @@ function object:draw() ----------------                                         
         local sY = self.size/tH
         local r = self.newBody:getAngle()
 
+        love.graphics.draw(self.particlesSystem,0,0)
         love.graphics.draw(self.texture,x,y,r,sX,sY,500/2,500/2)
     end
 end
@@ -814,6 +841,8 @@ function object:update(dt)
 
         local spawnX, spawnY = cannonX + math.cos(angle) * (self.radius + 10), cannonY + math.sin(angle) * (self.radius + 10)
 
+        self.particlesSystem:update(dt)
+
         self.shootCD = self.shootCD - dt
         self.newBody:setAngle(angle)
         if self.shootCD <= 0 then
@@ -821,6 +850,9 @@ function object:update(dt)
             table.insert(projectiles, newProjectile)
             
             self.shootCD = self.maxShootCD
+            self.particlesSystem:setDirection(angle)
+            self.particlesSystem:setPosition(cannonX,cannonY)
+            self.particlesSystem:emit(25)
             self.shootsfx:clone():play()
         end
 
@@ -844,16 +876,18 @@ function object:update(dt)
         local dy = playerY - pY
         local angle = math.atan2(dy, dx)
 
+        self.particlesSystem:update(dt)
+
         self.newBody:setAngle(angle)
 
         self.targetX = playerX + math.cos(love.timer.getTime()*1)*300
 
         if pX ~= self.targetX then
             if pX < self.targetX then
-                self.newBody:applyLinearImpulse(400*dt,0)
+                self.newBody:applyLinearImpulse(350*dt,0)
             end
             if pX > self.targetX then
-                self.newBody:applyLinearImpulse(-400*dt,0)
+                self.newBody:applyLinearImpulse(-350*dt,0)
             end
         end
         if pY > 115 then
@@ -862,7 +896,13 @@ function object:update(dt)
 
         self.popCD = self.popCD - dt
         if self.popCD <= 0 then
-            local shots = 16
+            local otherPoppers = 0
+            for _, obj in ipairs(objects) do
+                if obj.obj == "popper" then
+                    otherPoppers = otherPoppers + 1
+                end
+            end
+            local shots = 12-(math.min(8,(otherPoppers*4)))
             for i = 1, shots do
                 local difference = (math.pi/3)/shots
                 local applied = (angle - (difference*shots)/2) + difference*i
@@ -870,6 +910,9 @@ function object:update(dt)
                 table.insert(projectiles, newProjectile)
             end
             self.popCD = self.popCDmax
+            self.particlesSystem:setDirection(angle)
+            self.particlesSystem:setPosition(pX,pY)
+            self.particlesSystem:emit(25)
             self.popsfx:clone():play()
         end
 

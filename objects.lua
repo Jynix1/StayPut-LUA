@@ -857,7 +857,7 @@ function object:update(dt)
             end
         end
         if pY > 115 then
-            self.newBody:applyLinearImpulse(0,-4)
+            self.newBody:applyLinearImpulse(0,-8)
         end
 
         self.popCD = self.popCD - dt

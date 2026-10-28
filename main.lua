@@ -1,9 +1,16 @@
 -- StayPut 2. A passion project made to learn Lua and LÖVE2D.
 -- Originating from a game made in TurboWarp/Scratch. This is a remake of the original game in Lua using the LÖVE2D framework.
 
+-- Dependencies and version
 if os.getenv("LOVE2D_TOOLS") then
 	pcall(require, "_love2d_tools_bridge")
 end
+
+GAME_VER = "v0.1.0"
+
+local https = require("https")
+local json = require("lib/json")
+local updNotifTime = 0
 
 local Player = require("baller")
 local object = require("objects")
@@ -12,6 +19,7 @@ local lastEnemy = nil
 
 local discordrefreshTimer = 0
 
+-- Runtime state
 local gameoverOptions = {
 	[1] = "RESTART EXPERIMENT",
 	[2] = "STOP PROGRAM",
@@ -50,6 +58,7 @@ keybind_WIP_timer = 0
 keybind_toBeEdited = nil
 editingMasterVolume = false
 
+-- Click effects
 local clickfx = love.graphics.newCanvas(240,200)
 clickfx:renderTo(function ()
 	love.graphics.rectangle("fill",0,0,240,200)
@@ -60,6 +69,9 @@ clickfxSquareSystem:setParticleLifetime(0.4)
 clickfxSquareSystem:setSpeed(0)
 clickfxSquareSystem:setColors(1,0,0,1,1,0,0,0)
 
+-- +==========================================================================+
+-- | GAME DATA AND OPTIONS                                                    |
+-- +==========================================================================+
 RoundData = {
 
 	ongoing = true,
@@ -83,6 +95,7 @@ AchievementData = {
 	chipDamageTaken = 0,
 }
 
+-- Enemy and upgrade options
 EnemyOptions = {
 	{
 		id = "square",
@@ -188,6 +201,7 @@ OffensiveEnemies = {
 	{ id = "tripmine" },
 }
 
+-- choice UI state and selection
 local ChoiceButtons = {
 	{ x = 115, y = 100, width = 240, height = 200, id = "", title = "", desc = "" },
 	{ x = 413, y = 100, width = 240, height = 200, id = "", title = "", desc = "" },
@@ -287,6 +301,7 @@ local function refreshUpgradeChoiceButtons()
 	end
 end
 
+-- World objects and developer controls
 objects = {}
 
 local spawnHold = {} --                                         -----------------------  Dev utility to spawn stuff
@@ -304,8 +319,9 @@ local spawnKeyConfig = { --
 	["9"] = "popper",
 }
 
+-- Menu and Discord presence
 local Menu = require("menu")
-local discordRPC = require("discordRPC")
+local discordRPC = require("lib/discordRPC")
 local discordAppId = os.getenv("DISCORD_APP_ID") or "1522718970082365480"
 local discordEnabled = false
 local discordPresenceStart = nil
@@ -336,6 +352,9 @@ local function updateDiscordPresence()
 	end
 end
 
+-- +==========================================================================+
+-- | LÖVE INITIALIZATION                                                      |
+-- +==========================================================================+
 function love.load()
 	love.graphics.setDefaultFilter("linear", "linear")
 
@@ -356,7 +375,7 @@ function love.load()
 	local floorTopY = 490
 	local floorCenterY = floorTopY + (floorHeight / 2)
 
-	Camera = require("camera")
+	Camera = require("lib/camera")
 	cam = Camera(533, 300)
 	camZoom = 1
 	camZoom2 = 1
@@ -462,10 +481,15 @@ function love.load()
 
 	randomStartingCard()
 
+	local versioncheck = love.thread.newThread("versioncheck.lua")
+	versioncheck:start(GAME_VER)
+	UpdateStatus = nil
+
 	--gameCanvas = love.graphics.newCanvas(gameWidth, gameHeight)
 	--gameCanvas:setFilter("nearest", "nearest")
 end
 
+-- Background effects
 local backgroundElements = {}
 local function createBgElement(type,x,y,dx,dy,lifetime)
 
@@ -571,7 +595,10 @@ local function updateBG(dt)
 	end
 end
 
-function love.update(dt) --                                                                                               ----  v v v  | main game loop |  v v v  ----
+-- +==========================================================================+
+-- | MAIN UPDATE LOOP                                                         |
+-- +==========================================================================+
+function love.update(dt) --                                                                   ----  v v v  | main game loop |  v v v  ----
 	if discordEnabled then
 		discordRPC.runCallbacks()
 		passivediscordupdate(dt)
@@ -623,6 +650,16 @@ function love.update(dt) --                                                     
 		end
 	end
 
+	local threadReturns = love.thread.getChannel("result"):pop()
+
+	if (UpdateStatus == nil or UpdateStatus == "") and threadReturns ~= nil then
+		UpdateStatus = threadReturns
+	end
+
+	if UpdateStatus ~= "" and UpdateStatus ~= nil then
+		updNotifTime = updNotifTime + dt
+	end
+
 	Musichandler.update(dt)
 	
 	if gameRunning then
@@ -650,7 +687,7 @@ function love.update(dt) --                                                     
 
 			updateCamera()
 
-			local moveForce = 500
+			local moveForce = 600
 			for _, obj in ipairs(objects) do
 				if obj.obj == "musicbox" and obj.newBody then
 					local px, py = player.body:getPosition()
@@ -814,6 +851,7 @@ function love.update(dt) --                                                     
 	menu:update()
 end
 
+-- LÖVE shutdown callback
 function love.quit()
 	if discordEnabled then
 		discordRPC.clearPresence()
@@ -822,6 +860,7 @@ function love.quit()
 	return false
 end
 
+-- Main draw callback
 function love.draw() --                                                                                        ----  v v v  | all drawing |  v v v  ----
 	-------------
 
@@ -892,6 +931,10 @@ function love.draw() --                                                         
 		menu:draw()
 	end
 
+	if UpdateStatus ~= "" and UpdateStatus ~= nil then
+		drawUpdNotification(updNotifTime)
+	end
+
 	-------------------
 	love.graphics.pop()
 end
@@ -920,7 +963,10 @@ function drawGame()
 	drawIndicator()
 end
 
--- handle keyboard input for menu and dev controls
+-- +==========================================================================+
+-- | INPUT CALLBACKS                                                          |
+-- +==========================================================================+
+-- Handles keyboard input for menus and developer controls.
 function love.keypressed(key)
 	if key == "f1" then
 		for i, item in pairs(RoundData.enemiesActive) do
@@ -1164,6 +1210,7 @@ function love.keypressed(key)
 	end
 end
 
+-- Mouse input and coordinate conversion
 function love.mousepressed(mx, my, button)
 	local newx, newy = getVirtualMousePosition(mx, my)
 	if RoundData.enemyPicker and button == 1 and not GAMEOVER then
@@ -1198,6 +1245,7 @@ function love.mousepressed(mx, my, button)
 	end
 end
 
+-- Discord presence refresh
 function passivediscordupdate(dt)
 	discordrefreshTimer = discordrefreshTimer - dt
 	if discordrefreshTimer <= 0 then
@@ -1218,6 +1266,9 @@ function getVirtualMousePosition(mx, my)
 	return vx, vy
 end
 
+-- +==========================================================================+
+-- | GAME STATE MANAGEMENT                                                    |
+-- +==========================================================================+
 function clearAllObjects()
 	for i = #objects, 1, -1 do
 		local obj = objects[i]
@@ -1288,6 +1339,9 @@ function updateCamera()
 	cam:zoomTo(camZoom2)
 end
 
+-- +==========================================================================+
+-- | GAME RENDERING                                                           |
+-- +==========================================================================+
 function drawPlayerUI()
 	local self = player
 	local hpBar = self.hpBar or 100
@@ -1397,6 +1451,7 @@ function drawPlayerUI()
 	love.graphics.pop()
 end
 
+-- World and game-over rendering
 function drawFloor()
 	local floorWidth = 700
 	local floorHeight = 400
@@ -1530,6 +1585,7 @@ function drawGAMEOVER()
 
 end
 
+-- Choice rendering
 function drawChoiceButtons()
 	for i, btn in ipairs(ChoiceButtons) do
 		local designY = btn.y + math.sin(love.timer.getTime()) * 10
@@ -1599,5 +1655,62 @@ function drawUpgradeChoiceButtons()
 		love.graphics.printf(btn.desc, btn.x + 10, designY + 60, btn.width - 20, "left")
 	end
 end
--- TODO: improve menu UI maybe. finish gameover. stayput title card/icon on menu? add fillings to objects that look werid without background (box,stopwire)
--- TODO: add SFX for clicking cards, for rounds ending, etc
+
+--[[ function checkVersion()
+	local url = "https://api.github.com/repos/Jynix1/StayPut-LUA/releases/latest"
+	local everythingOK, status, body = pcall(https.request, url, {
+	    method = "GET",
+    	headers = {
+        ["User-Agent"] = "StayPutLUA",
+        ["Accept"] = "application/vnd.github+json"
+    }
+	})
+
+	local updStatus = ""
+
+	if not everythingOK then
+		updStatus = "HTTPS GitHub request error:"..status
+		return updStatus
+	end
+
+	if status ~= 200 then
+		if status == 0 then
+			updStatus = "Failed to request a check for updates. No internet?"
+			return updStatus
+		else
+			updStatus = status.." error; "..body
+			return updStatus
+		end
+	end
+
+	local decodeOK, data = pcall(json.decode, body)
+	local latestVer = data.tag_name
+
+	if latestVer ~= GAME_VER then
+		updStatus = "outdated"
+	elseif latestVer == GAME_VER then
+		updStatus = "uptodate"
+	end
+
+	return updStatus
+end ]]
+
+-- Update notification
+function drawUpdNotification(timeAlive)
+	local time = love.timer.getTime()
+	local c = math.cos(time*10)/2
+
+	local texttoshow = ""
+	if UpdateStatus == "" or UpdateStatus == nil then return end
+	if UpdateStatus == "outdated" then
+		love.graphics.setColor(1,1,0.5+c,1-(timeAlive/10))
+		texttoshow = "Game version mismatch! Could be outdated. Download the latest release on the Repo."
+	else
+		love.graphics.setColor(1,0.5+c,0.5+c,1-(timeAlive/10))
+		texttoshow = UpdateStatus
+	end
+
+	love.graphics.setFont(tobyfont)
+	
+	love.graphics.print(texttoshow, 25,25,0,0.5,0.5)
+end

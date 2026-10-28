@@ -47,7 +47,7 @@ function Player.new(world, x, y)
     instance.fixture = love.physics.newFixture(instance.body, instance.shape, 1)
     instance.fixture:setRestitution(0.6)
     instance.fixture:setFriction(0.9)
-    instance.body:setLinearDamping(0.3)
+    instance.body:setLinearDamping(1)
     instance.body:setAngularDamping(2)
 
     instance.fixture:setUserData({ type = "player", owner = instance })
@@ -306,7 +306,7 @@ function Player:jump(force)
 
     if standingOnGround then
         local vx,vy = self.body:getLinearVelocity()
-        self.body:setLinearVelocity(vx, (-force*1.25) + (hitBodyY * 0.25))
+        self.body:setLinearVelocity(vx, (-force*1.13) + (hitBodyY * 0.25))
         self.canJump = false
 
         self.pSystem2:setPosition(cx+15, cy+25)
@@ -314,7 +314,7 @@ function Player:jump(force)
     else
         if self.DoubleJumps > 0 then
             local vx,vy = self.body:getLinearVelocity()
-            self.body:setLinearVelocity(vx, -force*1.2)
+            self.body:setLinearVelocity(vx, -force*1.12)
             self.DoubleJumps = self.DoubleJumps - 1
             self.canJump = false
             self.doublejumpsfx:clone():play()
@@ -383,13 +383,13 @@ function Player:wallbounce(force)
 
     if wallOnLeft then
         local vx, vy = self.body:getLinearVelocity()
-        self.body:setLinearVelocity(force, -force/1.3)
+        self.body:setLinearVelocity(force/1.3, -force/1.95)
 
         self.starbouncePSystem:setPosition(cx, cy)
         self.starbouncePSystem:emit(3)
     elseif wallOnRight then
         local vx, vy = self.body:getLinearVelocity()
-        self.body:setLinearVelocity(-force, -force/1.3)
+        self.body:setLinearVelocity(-force/1.3, -force/1.95)
 
         self.starbouncePSystem:setPosition(cx, cy)
         self.starbouncePSystem:emit(3)

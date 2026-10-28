@@ -18,13 +18,27 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Read version from commit message
+        id: release_version
+        shell: pwsh
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          if ($env:COMMIT_MESSAGE -match '(?im)^\s*v\s*:\s*(\d+\.\d+\.\d+)\s*$') {
+            "custom_tag=v$($Matches[1])" >> $env:GITHUB_OUTPUT
+          } elseif ($env:COMMIT_MESSAGE -match '(?im)^\s*v\s*:') {
+            throw "Version must use the format v:1.2.3"
+          } else {
+            "custom_tag=" >> $env:GITHUB_OUTPUT
+          }
+
       - name: Bump Version and Push Tag
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           default_bump: patch
-          # Removed 'custom_tag' so it automatically increments (0.0.1 -> 0.0.2 etc.)
+          custom_tag: ${{ steps.release_version.outputs.custom_tag }}
 
       - name: Create .love Package
         run: |
@@ -51,6 +65,7 @@ jobs:
           
           # Copies the custom Discord RPC DLL into the same folder as the .exe
           copy discord-rpc.dll dist\
+          copy https.dll dist\
           
           # Zips the final executable folder for the release using the new tag
           Compress-Archive -Path dist\* -DestinationPath StayPutLUA-${{ steps.tag_version.outputs.new_tag }}-Windows.zip

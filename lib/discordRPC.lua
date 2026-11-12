@@ -1,3 +1,4 @@
+---@diagnostic disable: cast-local-type, inject-field, need-check-nil
 local ffi = require "ffi"
 
 local discordRPClib

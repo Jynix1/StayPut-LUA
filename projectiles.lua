@@ -191,7 +191,7 @@ function Projectile:onHitPlayer()
         table.insert(player.statusEffects, { id = "slowness", name = "Slowness", duration = 0.35, level = 3 })
         table.insert(player.statusEffects, { id = "slowness", name = "Slowness", duration = 3, level = 3 })
 
-        if distance > 0 then
+        if distance > 0 and noplayerinvuln then
             local KBforce = 625
             local KBx = (dx / distance) * KBforce
             local KBy = (dy / distance) * KBforce

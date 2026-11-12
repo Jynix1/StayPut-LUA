@@ -6,15 +6,43 @@ if os.getenv("LOVE2D_TOOLS") then
 	pcall(require, "_love2d_tools_bridge")
 end
 
-GAME_VER = "v0.1.3"
+GAME_VER = "v0.1.4"
 
-local https = require("https")
-local json = require("lib/json")
 local updNotifTime = 0
+
+objects = {}
+bosses = {}
+
+-- getting helpers -----------------------------------
+
+local Menu = require("menu")
+local discordRPC = require("lib/discordRPC")
 
 local Player = require("baller")
 local object = require("objects")
-local Musichandler = require("musichandler")
+local boss = require("bosses")
+
+local https = require("https")
+local json = require("lib/json")
+
+local Musichandler = require("/helpers/musichandler")
+local drawButtons = require("/helpers/drawbuttons")
+local gameoverHelper = require("/helpers/gameoverhelper")
+local otherrenders = require("/helpers/otherrenders")
+local roundlogic = require("/helpers/roundlogic")
+------ drawButtons.lua
+local drawChoiceButtons = drawButtons.drawChoiceButtons
+local drawUpgradeChoiceButtons = drawButtons.drawUpgradeChoiceButtons
+-- gameoverhelper.lua
+local drawGAMEOVER = gameoverHelper.drawGAMEOVER
+-- otherrenders.lua
+local drawPlayerUI = otherrenders.drawPlayerUI
+local drawIndicator = otherrenders.drawIndicator
+local drawFloor = otherrenders.drawFloor
+-- roundlogic.lua
+local roundUpdate = roundlogic.roundUpdate
+-- ^ applying helper functions ^ ---------------------
+
 local lastEnemy = nil
 
 local discordrefreshTimer = 0
@@ -27,10 +55,11 @@ local gameoverOptions = {
 }
 local gameoverSelected = 0
 local gameoverTimeAt = nil
-local greenFlashAlpha = 0
+greenFlashAlpha = 0
 
 local quitCount = 0
 local quitCountTimer = 3
+
 local function removenum(id)
 	return id:gsub("%d", "")
 end
@@ -202,13 +231,13 @@ OffensiveEnemies = {
 }
 
 -- choice UI state and selection
-local ChoiceButtons = {
+ChoiceButtons = {
 	{ x = 115, y = 100, width = 240, height = 200, id = "", title = "", desc = "" },
 	{ x = 413, y = 100, width = 240, height = 200, id = "", title = "", desc = "" },
 	{ x = 711, y = 100, width = 240, height = 200, id = "", title = "", desc = "" },
 }
 
-local UpgradeChoiceButtons = {
+UpgradeChoiceButtons = {
 	{ x = 115, y = 100, width = 240, height = 200, id = "", title = "", desc = "" },
 	{ x = 413, y = 100, width = 240, height = 200, id = "", title = "", desc = "" },
 	{ x = 711, y = 100, width = 240, height = 200, id = "", title = "", desc = "" },
@@ -301,9 +330,6 @@ local function refreshUpgradeChoiceButtons()
 	end
 end
 
--- World objects and developer controls
-objects = {}
-
 local spawnHold = {} --                                         -----------------------  Dev utility to spawn stuff
 local spawnHoldDelay = 0.75 --
 local spawnHoldRepeatInterval = 0.01 --
@@ -317,11 +343,11 @@ local spawnKeyConfig = { --
 	["7"] = "tripmine",
 	["8"] = "cannon",
 	["9"] = "popper",
+	["0"] = "clone",
 }
 
--- Menu and Discord presence
-local Menu = require("menu")
-local discordRPC = require("lib/discordRPC")
+-- Discord presence
+
 local discordAppId = os.getenv("DISCORD_APP_ID") or "1522718970082365480"
 local discordEnabled = false
 local discordPresenceStart = nil
@@ -376,6 +402,7 @@ function love.load()
 	local floorCenterY = floorTopY + (floorHeight / 2)
 
 	Camera = require("lib/camera")
+	Flux = require("lib/flux")
 	cam = Camera(533, 300)
 	camZoom = 1
 	camZoom2 = 1
@@ -386,7 +413,6 @@ function love.load()
 	floorBody = love.physics.newBody(world, 533, floorCenterY, "static")
 	floorShape = love.physics.newRectangleShape(floorWidth, floorHeight)
 	floorFixture = love.physics.newFixture(floorBody, floorShape)
-	floorFixture:setFriction(1)
 	floorFixture:setFriction(1)
 
 	GAMEOVER = false
@@ -407,6 +433,8 @@ function love.load()
 	barRecoverSound = love.audio.newSource("sounds/sfx/barheal.mp3", "static")
 	barRecoverSound:setPitch(1.3)
 	barRecoverSound:setVolume(0.65)
+
+	hpImg = love.graphics.newImage("sprites/mint/hp.png")
 
 	menuVisible = true
 	gameRunning = false
@@ -481,7 +509,7 @@ function love.load()
 
 	randomStartingCard()
 
-	local versioncheck = love.thread.newThread("versioncheck.lua")
+	local versioncheck = love.thread.newThread("helpers/versioncheck.lua")
 	versioncheck:start(GAME_VER)
 	UpdateStatus = nil
 
@@ -523,7 +551,11 @@ local function drawBG(screenWidth, screenHeight)
 		else
 			love.graphics.clear(0.04, 0.02, 0.08)
 
-			love.graphics.setColor(0.1, 0.04, 0.22, 0.5)
+			if RoundData.level < 10 then
+				love.graphics.setColor(0.247, 0.129, 0.129, 0.5)
+			else
+				love.graphics.setColor(0.408, 0, 0.459, 0.5)
+			end
 
 			local amount = 2
 			local h = 90 / amount
@@ -536,8 +568,14 @@ local function drawBG(screenWidth, screenHeight)
 			for _, element in ipairs(backgroundElements) do
 				if element.type == "dot" then
 					love.graphics.setBlendMode("alpha")
-					love.graphics.setColor(0.349, 0, 1, 0.014)
-					love.graphics.circle("fill",element.x,element.y,8)
+					love.graphics.setColor(1, 0, 0, 0.010)
+					love.graphics.circle("fill",element.x,element.y,12)
+					love.graphics.setBlendMode("alpha")
+				end
+				if element.type == "dot2" then
+					love.graphics.setBlendMode("alpha")
+					love.graphics.setColor(0.882, 0, 1, 0.01)
+					love.graphics.circle("fill",element.x,element.y,6)
 					love.graphics.setBlendMode("alpha")
 				end
 			end
@@ -580,19 +618,23 @@ local function updateBG(dt)
 	if particleSpawnTimer <= 0 then
 	for i = 1, 4 do
 		local dir,spread
+		local typetomake = ""
 		
 		if RoundData.level < 10 then
 			dir,spread = math.rad(225),math.rad(math.cosh(phase)*115)
+			typetomake = "dot"
 		elseif RoundData.level < 20 then
 			dir,spread = math.rad(225),math.rad(math.cos(phase)*115)
+			typetomake = "dot2"
 		else
 			dir,spread = math.rad(225),math.rad(math.tan(phase)*115)
+			typetomake = "dot"
 		end
 
 		local angle = dir + (i - 2.5) * (spread / 4)
 		local dx = math.cos(angle) * (40)
 		local dy = math.sin(angle) * (40)
-		createBgElement("dot",160,90,dx,dy,8)
+		createBgElement(typetomake,160,90,dx,dy,8)
 		particleSpawnTimer = 0.001
 	end
 	else
@@ -632,15 +674,27 @@ function love.update(dt) --                                                     
 
 	for key, objType in pairs(spawnKeyConfig) do --------------------------------------------  place holder dev key
 		if love.keyboard.isDown(key) then
+
 			local data = spawnHold[key]
 			if not data then
-				spawnHold[key] = {
-					timer = 0,
-					repeatTimer = 0,
-					type = objType,
-				}
-				local newObject = object:new(533, 0, objType)
-				table.insert(objects, newObject)
+				if key ~= "0" then
+					spawnHold[key] = {
+						timer = 0,
+						repeatTimer = 0,
+						type = objType,
+					}
+					local newObject = object:new(533, 0, objType)
+					table.insert(objects, newObject)
+				else
+					spawnHold[key] = {
+						timer = 0,
+						repeatTimer = 0,
+						type = objType,
+					}
+					local newBoss = boss:new(533,0,"clone")
+					table.insert(bosses,newBoss)
+				end
+
 			else
 				data.timer = data.timer + dt
 				data.repeatTimer = data.repeatTimer - dt
@@ -691,6 +745,7 @@ function love.update(dt) --                                                     
 			end
 
 			updateCamera()
+			Flux.update(dt)
 
 			local moveForce = 600
 			for _, obj in ipairs(objects) do
@@ -709,11 +764,17 @@ function love.update(dt) --                                                     
 				end
 			end
 
+			for i = #bosses, 1, -1 do
+				local bos = bosses[i]
+				bos:update(dt)
+			end
+
 			if GAMEOVER then
 				RoundData.enemyPicker = false
 				RoundData.upgradePicker = false
 				RoundData.ongoing = true
 				Musichandler:reset()
+				clearAllObjects()
 				if gameoverTimeAt == nil then
 					gameoverTimeAt = love.timer.getTime()
 					sfx_crit:clone():play()
@@ -734,103 +795,17 @@ function love.update(dt) --                                                     
 				player:OffStageRespawn()
 			end
 
-			if RoundData.ongoing and not GAMEOVER then -- round stuff including timer, spawning objs, etc
-				RoundData.time = RoundData.time - dt
-				RoundData.spawnTimer = RoundData.spawnTimer - dt
-				if player.hp > 0 then
-					AchievementData.surviveTime = AchievementData.surviveTime + dt
-				end
-
-				if RoundData.spawnTimer <= 0 then -- spawn now
-					if #RoundData.enemiesActive > 0 then
-						local random = love.math.random(1, #RoundData.enemiesActive)
-						local enemyIdToSpawn = RoundData.enemiesActive[random]
-						local tripwireExists = false
-
-						if enemyIdToSpawn == "tripwire" then -- anti stopwire
-							if objects and #objects > 0 then
-								for _, obj in ipairs(objects) do
-									if obj.obj == "tripwire" then
-										tripwireExists = true
-									end
-								end
-							end
-						end
-
-						if tripwireExists then -- anti stopwire
-							repeat
-								random = love.math.random(1, #RoundData.enemiesActive)
-								enemyIdToSpawn = RoundData.enemiesActive[random]
-							until enemyIdToSpawn ~= "tripwire"
-						end
-
-						if--make sure annoying enemies don't spawn twice in a row, if there are other enemies to spawn
-							lastEnemy ~= nil
-							and lastEnemy == "tripwire"
-							and enemyIdToSpawn == "tripwire"
-							and #RoundData.enemiesActive > 1
-						then
-							repeat
-								random = love.math.random(1, #RoundData.enemiesActive)
-								enemyIdToSpawn = RoundData.enemiesActive[random]
-							until enemyIdToSpawn ~= "tripwire"
-						end
-
-						if--make sure annoying enemies don't spawn twice in a row, if there are other enemies to spawn
-							lastEnemy ~= nil
-							and lastEnemy == "musicbox"
-							and enemyIdToSpawn == "musicbox"
-							and #RoundData.enemiesActive > 1
-						then
-							repeat
-								random = love.math.random(1, #RoundData.enemiesActive)
-								enemyIdToSpawn = RoundData.enemiesActive[random]
-							until enemyIdToSpawn ~= "musicbox"
-						end
-
-						lastEnemy = enemyIdToSpawn
-
-						local spawnX = love.math.random(200, 866)
-
-						local enemyCD = 0
-						for _, option in ipairs(EnemyOptions) do -- get enemy's added spawn cd and add it to the TBO timer
-							if option.id == enemyIdToSpawn then
-								enemyCD = option.cd or 0
-							end
-						end
-
-						local newEnemy = object:new(spawnX, -100, enemyIdToSpawn)
-						table.insert(objects, newEnemy)
-						RoundData.spawnTimer = RoundData.difficultyTBO + enemyCD
-					end
-				end
-			end
+			roundUpdate(dt,object)
 
 			if RoundData.time <= 0 then -- round end
-				RoundData.ongoing = false
-
-				clearAllObjects()
-				greenFlashAlpha = 0.5
-
-				RoundData.level = RoundData.level + 1
-				RoundData.starttime = RoundData.starttime + 3
-				RoundData.time = RoundData.starttime
-				RoundData.difficultyTBO = RoundData.difficultyTBO - 0.2
 				updateDiscordPresence()
 
-				if RoundData.level % 10 == 0 and RoundData.level ~= 0 then
-					RoundData.upgradePicker = true
-					refreshUpgradeChoiceButtons()
-				elseif RoundData.level % 2 == 0 or RoundData.level == 1 then
-					RoundData.enemyPicker = true
-					refreshChoiceButtons()
-				else
-					RoundData.ongoing = true
-				end
+				local result = roundlogic.onRoundEnd()
 
-				player:QueueHeal(2, 4, 50)
-				if player.hpBar < 100 then
-					barRecoverSound:play()
+				if result == "upgrade" then
+					refreshUpgradeChoiceButtons()
+				elseif result == "enemy" then
+					refreshChoiceButtons()
 				end
 			end
 		else -- if intro hasnt been played before then
@@ -896,7 +871,7 @@ function love.draw() --                                                         
 	end
 
 	if GAMEOVER and gameoverTimeAt then
-		drawGAMEOVER()
+		drawGAMEOVER(gameoverTimeAt,gameoverOptions,gameoverSelected)
 	end
 
 	if gameStarted and not GAMEOVER then
@@ -955,6 +930,10 @@ function drawGame()
 
 	for _, proj in ipairs(projectiles) do -- drawing projectiles
 		proj:draw()
+	end
+
+	for _, boss in ipairs(bosses) do
+		boss:draw()
 	end
 
 	love.graphics.setColor(1,1,1,1)
@@ -1215,7 +1194,7 @@ function love.keypressed(key)
 	end
 end
 
--- Mouse input and coordinate conversion
+-- Mouse input and coordinate conversion cuz the game runs on canvas
 function love.mousepressed(mx, my, button)
 	local newx, newy = getVirtualMousePosition(mx, my)
 	if RoundData.enemyPicker and button == 1 and not GAMEOVER then
@@ -1341,335 +1320,34 @@ function updateCamera()
 	local amountOfObjects = #objects
 	camZoom = 1 - (math.min(amountOfObjects, 30) * 0.01)
 	camZoom2 = camZoom2 + ((camZoom - camZoom2) / 24)
-	cam:zoomTo(camZoom2)
-end
-
--- +==========================================================================+
--- | GAME RENDERING                                                           |
--- +==========================================================================+
-function drawPlayerUI()
-	local self = player
-	local hpBar = self.hpBar or 100
-	local hpBarMax = self.hpBarMax or 100
-	local pct = math.max(0, math.min(1, hpBar / hpBarMax))
-	local i_frame_pct = math.max(0, math.min(1, self.invulnTimer / 4))
-
-	local barX, barY, barW, barH = 30, 55, 125, 8
-	local fillW = math.max(0, pct * barW)
-
-	local shakeTime = self.hurtShakeTime or 0
-	local shakeAmount = self.hurtShakeAmount or 0
-	local shake = shakeTime > 0 and math.min(1, shakeTime / 0.12) or 0
-	local offsetX = ((math.random() * 2) - 1) * shakeAmount * shake
-	local offsetY = ((math.random() * 2) - 1) * shakeAmount * shake
-
-	love.graphics.push()
-	love.graphics.translate(offsetX, offsetY)
-
-	love.graphics.setLineWidth(3)
-	love.graphics.setLineStyle("rough")
-
-	love.graphics.setColor(0, 0, 0, 0.6)
-	love.graphics.rectangle("fill", barX - 2, barY - 2, barW + 4, barH + 4)
-
-	if self.invulnTimer and self.invulnTimer > 0 then
-		love.graphics.setColor(0.855, 1, 0.851)
-	else
-		if self.hpBar < 30 then
-			love.graphics.setColor(1, 0, 0, 1)
-		else
-			love.graphics.setColor(1, 1, 1, 1)
-		end
-	end
-	love.graphics.rectangle("fill", barX, barY, fillW, barH)
-
-	love.graphics.setColor(1, 1, 1, 1)
-	love.graphics.rectangle("line", barX, barY, barW, barH)
-
-	if self.invulnTimer > 0 then
-		love.graphics.setColor(0, 0.718, 1)
-		local currentW = barW * i_frame_pct
-		-- Top line
-		love.graphics.line(barX, barY, barX + currentW, barY)
-		-- Bottom line
-		love.graphics.line(barX, barY + barH, barX + currentW, barY + barH)
-		-- Left tiny line
-		love.graphics.line(barX, barY - 1.5, barX, barY + barH + 1.5)
-	end
-
-	local font = love.graphics.newFont("fonts/tiny5.ttf", 18)
-	love.graphics.setDefaultFilter("linear")
-	love.graphics.setFont(font)
-
-	love.graphics.setColor(1, 1, 1, 1)
-	love.graphics.print(tostring(math.floor(hpBar)) .. "%", barX - 2 + barW + 12, barY - 6)
-
-	local font2 = love.graphics.newFont("fonts/tiny5.ttf", 32)
-	love.graphics.setFont(font2)
-
-	love.graphics.print("HP: " .. (self.hp or 0) .. "/" .. (self.maxHP or 4), 35, 10)
-
-	-- -- -- -- Status Effects
-	if next(player.statusEffects) ~= nil then
-		local x,y = 10,200
-		local width,height = 150,50
-		
-		for _, effect in ipairs(player.statusEffects) do
-			love.graphics.setColor(0,0,0,0.5)
-			love.graphics.rectangle("fill",x,y,width,height)
-
-			love.graphics.setFont(font)
-			love.graphics.setColor(1,1,1,0.75)
-			love.graphics.printf(effect.name.." "..effect.level,x+10,y, width,"left")
-
-			local dur = string.format("%.2f",effect.duration)
-			love.graphics.setFont(font2)
-			love.graphics.setColor(1,1,1,0.5)
-			love.graphics.printf(dur,x+10,y+15,width,"left")
-			y = y + 50
-		end
-	end
-
-	if love.keyboard.isDown("tab") and next(RoundData.enemiesActive) ~= nil then
-		local x,y,w,h = 533,300,600,400
-		love.graphics.setColor(0,0,0,0.5)
-		love.graphics.rectangle("fill",x - w/2, y - h/2, w,h)
-		love.graphics.setColor(1,0,0,1)
-		love.graphics.rectangle("line",x - w/2, y - h/2, w,h)
-		for _, item in ipairs(RoundData.enemiesActive) do
-			local id = item
-			local title
-			for _, item in ipairs(EnemyOptions) do
-				if id == item.id then
-					title = item.title
-				end
-			end
-			love.graphics.setColor(1,1,1,1)
-			love.graphics.printf(title,(x+15)-w/2,(y+20)-h/2,w,"left")
-
-			y = y+35
-
-			-- when adding more objects itll eventually go under the window, so make it go to the other side
-		end
-	end
-
-	love.graphics.pop()
+	cam:zoomTo(camZoom2 * (Dev and Dev.cameraZoomMultiplier or 1))
 end
 
 -- World and game-over rendering
-function drawFloor()
-	local floorWidth = 700
-	local floorHeight = 400
-
-	local fx = floorBody:getX() - (floorWidth / 2)
-	local fy = floorBody:getY() - (floorHeight / 2)
-
-	love.graphics.setColor(0, 0, 0, 1)
-	love.graphics.rectangle("fill", fx, fy, floorWidth, floorHeight)
-
-	love.graphics.setLineStyle("smooth")
-	love.graphics.setLineWidth(2)
-	love.graphics.setColor(1, 1, 1, 1)
-	love.graphics.rectangle("line", fx, fy, floorWidth, floorHeight)
-end
-
-function drawIndicator()
-	local px, py = player.body:getPosition()
-	local tW, tY = indicator:getDimensions()
-	local screenX, screenY = cam:cameraCoords(px, py, 0, 0, gameWidth, gameHeight)
-
-	local sX = (screenX < gameWidth / 2) and (-75 / tW) or (75 / tW)
-	local sY = 75 / tY
-
-	local ox = indicator:getWidth() / 2
-	local oy = indicator:getHeight() / 2
-	local offset = 65
-	local indicateIMAGE = indicator
-
-	if screenX < 0 or screenX > gameWidth or screenY < 0 or screenY > gameHeight then
-		if screenY > gameHeight then
-			indicateIMAGE = indicatorD
-		end
-		if screenY < 0 then
-			indicateIMAGE = indicatorU
-		end
-
-		showIndicator = true
-		ix = math.max(offset, math.min(gameWidth - offset, screenX))
-		iy = math.max(offset, math.min(gameHeight - offset, screenY))
-	else
-		showIndicator = false
-	end
-
-	if showIndicator then
-		love.graphics.draw(indicateIMAGE, ix, iy, 0, sX, sY, ox, oy)
-	end
-end
-
-function drawGAMEOVER()
-	local elapsed = love.timer.getTime() - gameoverTimeAt - 1
-
-	local rgb, alpha
-
-	if elapsed < 2 then
-		rgb = math.max(0, 1 - (elapsed / 2))
-		alpha = 1
-	else
-		rgb = 0
-		alpha = math.max(0, 1 - ((elapsed - 2) / 3))
-	end
-
-	love.graphics.setColor(1, 1, 1, 1)
-	local y = 75
-	love.graphics.setFont(consolefont)
-	love.graphics.print("THE PLAYER HAS REACHED AN END",50,y) love.graphics.setColor(1,0,0,0.4) love.graphics.print("[ERR 0x0001; HP IS ZERO]", 575,y)
-	y=y+35
-	love.graphics.setColor(1, 1, 1, 0.4)
-	love.graphics.print("-- SELECT AN OPTION BELOW",50,y)
-	y=y+150
-	for i, item in ipairs(gameoverOptions) do
-
-		--if this wasn't a comment then
-		--	 local dist = 250
-		--	 local totalSpan = (#gameoverOptions - 1) * dist
-		--	 local startx = 533 - (totalSpan / 2)
-		--	 local textwidth = tobyfont:getWidth(item)
-		--	 local x = startx + (i - 1) * dist - (textwidth / 2)
-		--	 local spread = (math.cos(love.timer.getTime()) * 4) + 1
-		--	 local color1
-		--	 local color2
-		--	 if gameoverSelected ~= i then
-		--	 	color1 = { 1, 1, 1, 0.25 }
-		--	 	color2 = { 1, 1, 1, 1 }
-		--	 else
-		--	 	color1 = { 1, 1, 0, 0.25 }
-		--	 	color2 = { 1, 1, 0, 1 }
-		--	 end
-		--	 if elapsed > 2 and gameoverSelected == i and gameoverSelected ~= 0 then
-		--	 	if cx == nil then
-		--	 		cx = 533
-		--	 	end
-		--	 	cx = cx + ((x + (tobyfont:getWidth(item) / 2) - cx) / 6)
-		--	 	love.graphics.draw(youblur, cx, 520, 0, 3, 3, youblur:getWidth() / 2, youblur:getHeight() / 2)
-		--	 elseif gameoverSelected == 0 then
-		--	 	love.graphics.draw(youblur, 533, 520, 0, 2, 2, youblur:getWidth() / 2, youblur:getHeight() / 2)
-		--	 end
-		--	 love.graphics.setColor(color1)
-		--	 love.graphics.print(item, x - spread, 500, 0, 1, 1)
-		--	 love.graphics.print(item, x + spread, 500, 0, 1, 1)
-		--	 love.graphics.print(item, x, 500 - spread, 0, 1, 1)
-		--	 love.graphics.print(item, x, 500 + spread, 0, 1, 1)
-		--	 love.graphics.setColor(color2)
-		--	 love.graphics.print(item, x, 500, 0, 1, 1)
-		--end
-
-		if gameoverSelected ~= i then
-			love.graphics.setColor(1,1,1,0.65)
-			love.graphics.print(item,80,y)
-		else
-			love.graphics.setColor(1,1,1,1)
-			love.graphics.print("> "..item,80,y)
-		end
-		y = y + 35
-	end
-	y = 500
-	if gameoverInfoShown then
-		love.graphics.setColor(1,1,1,0.75)
-		
-		love.graphics.print("PLAYER RECIEVED "..AchievementData.chipDamageTaken.." CHIP DAMAGE", 75, y)
-		y=y-35
-		love.graphics.print("PLAYER RECIEVED "..AchievementData.damageTaken.." FULL HITS", 75, y)
-		y=y-35
-		love.graphics.print("PLAYER SURVIVED FOR "..math.floor(AchievementData.surviveTime).." SECONDS", 75, y)
-		y=y-35
-		love.graphics.print("PLAYER REACHED LEVEL "..math.floor(RoundData.level), 75, y)
-	end
-	love.graphics.setColor(rgb, rgb, rgb, alpha)
-	love.graphics.rectangle("fill", 0, 0, 1066, 800)
-	
-
-end
+	-- moved to new file; see otherrenders.lua
+--
 
 -- Choice rendering
+--[[
 function drawChoiceButtons()
-	for i, btn in ipairs(ChoiceButtons) do
-		local designY = btn.y + math.sin(love.timer.getTime()) * 10
-		local btnY = designY + 50
-		local mx, my = getVirtualMousePosition(love.mouse.getPosition())
-
-		if
-			mx < btn.x + btn.width
-			and mx > btn.x
-			and my < btn.y + btn.height
-			and my > btn.y
-			and btn.title ~= "No Option"
-			and gameRunning
-		then
-			love.graphics.setColor(1, 0, 0, 0.15)
-		else
-			love.graphics.setColor(0, 0, 0, 0.5)
-		end
-
-		love.graphics.rectangle("fill", btn.x, designY, btn.width, btn.height)
-
-		love.graphics.setColor(1, 0, 0)
-		love.graphics.setLineWidth(2)
-		love.graphics.rectangle("line", btn.x, designY, btn.width, btn.height)
-		love.graphics.line(btn.x, btnY, btn.x + btn.width, btnY)
-
-		love.graphics.setFont(tobyfont)
-		love.graphics.setColor(1, 1, 1)
-		love.graphics.printf(btn.title, btn.x, designY + 5, btn.width, "center")
-
-		love.graphics.setFont(toby2font)
-		love.graphics.printf(btn.desc, btn.x + 10, designY + 60, btn.width - 20, "left")
-	end
+	moved to new file; see drawButtons.lua
 end
-
+]]
+--[[
 function drawUpgradeChoiceButtons()
-	for i, btn in ipairs(UpgradeChoiceButtons) do
-		local designY = btn.y + math.sin(love.timer.getTime()) * 10
-		local btnY = designY + 50
-		local mx, my = getVirtualMousePosition(love.mouse.getPosition())
-
-		if
-			mx < btn.x + btn.width
-			and mx > btn.x
-			and my < btn.y + btn.height
-			and my > btn.y
-			and btn.title ~= "No Option"
-			and gameRunning
-		then
-			love.graphics.setColor(0, 0.8, 1, 0.15)
-		else
-			love.graphics.setColor(0, 0, 0, 0.5)
-		end
-
-		love.graphics.rectangle("fill", btn.x, designY, btn.width, btn.height)
-
-		love.graphics.setColor(0, 0.8, 1)
-		love.graphics.setLineWidth(2)
-		love.graphics.rectangle("line", btn.x, designY, btn.width, btn.height)
-		love.graphics.line(btn.x, btnY, btn.x + btn.width, btnY)
-
-		love.graphics.setFont(tobyfont)
-		love.graphics.setColor(1, 1, 1)
-		love.graphics.printf(btn.title, btn.x, designY + 5, btn.width, "center")
-
-		love.graphics.setFont(toby2font)
-		love.graphics.printf(btn.desc, btn.x + 10, designY + 60, btn.width - 20, "left")
-	end
+	moved to new file; see drawButtons.lua
 end
+]]
 
 --[[ function checkVersion()
-	moved to new file
+	moved to new file; see versioncheck.lua
 end]]
 
 -- Update notification
 function drawUpdNotification(timeAlive)
 	local time = love.timer.getTime()
 	local c = math.cos(time*10)/2
-	local x, y = 25,25
+	local x, y = 45,55
 
 	local texttoshow = ""
 	if UpdateStatus == "" or UpdateStatus == nil then return end
@@ -1688,3 +1366,5 @@ function drawUpdNotification(timeAlive)
 	
 	love.graphics.print(texttoshow, x,y,0,0.55,0.55)
 end
+
+Dev = require("dev")

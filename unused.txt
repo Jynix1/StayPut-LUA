@@ -1,0 +1,35 @@
+		
+old gameover screen deltarune
+--if this wasn't a comment then
+		--	 local dist = 250
+		--	 local totalSpan = (#gameoverOptions - 1) * dist
+		--	 local startx = 533 - (totalSpan / 2)
+		--	 local textwidth = tobyfont:getWidth(item)
+		--	 local x = startx + (i - 1) * dist - (textwidth / 2)
+		--	 local spread = (math.cos(love.timer.getTime()) * 4) + 1
+		--	 local color1
+		--	 local color2
+		--	 if gameoverSelected ~= i then
+		--	 	color1 = { 1, 1, 1, 0.25 }
+		--	 	color2 = { 1, 1, 1, 1 }
+		--	 else
+		--	 	color1 = { 1, 1, 0, 0.25 }
+		--	 	color2 = { 1, 1, 0, 1 }
+		--	 end
+		--	 if elapsed > 2 and gameoverSelected == i and gameoverSelected ~= 0 then
+		--	 	if cx == nil then
+		--	 		cx = 533
+		--	 	end
+		--	 	cx = cx + ((x + (tobyfont:getWidth(item) / 2) - cx) / 6)
+		--	 	love.graphics.draw(youblur, cx, 520, 0, 3, 3, youblur:getWidth() / 2, youblur:getHeight() / 2)
+		--	 elseif gameoverSelected == 0 then
+		--	 	love.graphics.draw(youblur, 533, 520, 0, 2, 2, youblur:getWidth() / 2, youblur:getHeight() / 2)
+		--	 end
+		--	 love.graphics.setColor(color1)
+		--	 love.graphics.print(item, x - spread, 500, 0, 1, 1)
+		--	 love.graphics.print(item, x + spread, 500, 0, 1, 1)
+		--	 love.graphics.print(item, x, 500 - spread, 0, 1, 1)
+		--	 love.graphics.print(item, x, 500 + spread, 0, 1, 1)
+		--	 love.graphics.setColor(color2)
+		--	 love.graphics.print(item, x, 500, 0, 1, 1)
+		--end

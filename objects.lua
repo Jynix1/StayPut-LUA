@@ -258,7 +258,7 @@ function object:new(x, y, obj)
         instance.smolparticle:setLinearAcceleration(0,-200)
         instance.smolparticle:setLinearDamping(2)
 
-        instance.harmless = 1
+        instance.harmless = 2
 
         instance.spawn = love.audio.newSource("sounds/sfx/tripmine/spawn.mp3","static")
         instance.boom = love.audio.newSource("sounds/sfx/tripmine/boom.mp3","static")
@@ -474,7 +474,7 @@ function object:draw() ----------------                                         
         love.graphics.setColor(1,1,1,1)
         love.graphics.draw(self.explodep,0,0)
         love.graphics.draw(self.smolparticle,0,0)
-        love.graphics.setColor(1,1,1,alpha-self.harmless*2)
+        love.graphics.setColor(1,1,1,alpha-self.harmless/2)
 
         local x,y = self.newBody:getPosition()
         local tW,tH = self.texture:getDimensions()
@@ -486,7 +486,7 @@ function object:draw() ----------------                                         
         end
 
     elseif self.obj == "cannon" then
-        love.graphics.setColor(1,1,1,1)
+        love.graphics.setColor(1,1,1,alpha)
         local tW,tH = 434,434
         local x,y = self.newBody:getPosition()
         local d = (self.radius)*2
@@ -857,7 +857,7 @@ function object:update(dt)
         end
 
         if cannonY > 115 then 
-            self.newBody:applyLinearImpulse(0,-5)
+            self.newBody:applyLinearImpulse(0,-8)
         end
         self.newBody:applyLinearImpulse(dx*(dt*2),0)
         if cannonX < 0 then

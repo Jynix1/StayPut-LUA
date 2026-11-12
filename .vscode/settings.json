@@ -16,5 +16,6 @@
     "baller"
   ],
   "stylua.targetReleaseVersion": "latest",
-  "pixelbyte.love2d.path": "\\love11.5\\love.exe"
+  "pixelbyte.love2d.path": "\\love11.5\\love.exe",
+  "lövelauncher.path": "/run/media/deck/JAYJAYS-USB/! others/! Hobbies/StayPutLUA/love11.5/love.exe"
 }

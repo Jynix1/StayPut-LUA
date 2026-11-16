@@ -83,9 +83,13 @@ clickParticleSystem:setSpeed(75,125)
 clickParticleSystem:setColors(1,1,1,0,1,1,1,0.5,1,1,1,0)
 clickParticleSystem:setSizes(0.06)
 clickParticleSystem:setLinearAcceleration(0,300)
-keybind_WIP_timer = 0
-keybind_toBeEdited = nil
-editingMasterVolume = false
+
+keyEditing = {
+	keybind_WIP_timer = 0,
+	keybind_toBeEdited = "",
+	editingMasterVolume = false
+}
+
 
 -- Click effects
 local clickfx = love.graphics.newCanvas(240,200)
@@ -952,22 +956,64 @@ end
 -- +==========================================================================+
 -- Handles keyboard input for menus and developer controls.
 function love.keypressed(key)
-	if key == "f1" then
-		for i, item in pairs(RoundData.enemiesActive) do
-			print(i, item)
+
+	local keyActions = {
+		{
+			key = "f1",
+			desc = "Print enemiesActive",
+			action = function()
+				for i, item in pairs(RoundData.enemiesActive) do
+					print(i, item)
+				end
+			end,
+		},
+		{
+			key = "f4",
+			desc = "Clear console",
+			action = function()
+				print(string.rep("\n", 100))
+			end,
+		},
+		{
+			key = "0",
+			desc = "player hp = 0",
+			action = function()
+				player.hp = 0
+			end,
+		},
+		{
+			key = "backspace",
+			desc = "round time = 0",
+			requiresNormalInput = true,
+			action = function()
+				RoundData.time = 0
+			end,
+		},
+		{
+			key = "f11",
+			desc = "Toggle fullscreen",
+			requiresNormalInput = true,
+			action = function()
+				Fullscreen = not Fullscreen
+				love.window.setFullscreen(Fullscreen)
+				equipSound:clone():play()
+			end,
+		},
+	}
+
+	local normalInput = keyEditing.keybind_WIP_timer <= 0 and not keyEditing.editingMasterVolume
+	for _, keyAction in ipairs(keyActions) do
+		if key == keyAction.key and (not keyAction.requiresNormalInput or normalInput) then
+			keyAction.action()
 		end
 	end
 
-	if key == "f4" then -- clear console
-		print(string.rep("\n", 100))
-	end
-
-	local currentscreen = menu.currentScreen
-	if (keybind_WIP_timer <= 0) and (not editingMasterVolume) then
+	local currentscreen = menu.screen
+	if normalInput then
 		if key == "escape" and not IntroPlaying and not GAMEOVER then
 			if currentscreen == "settings" then
 				menuVisible = true
-				menu:setScreen("menu")
+				menu:setScreen("pause")
 			else
 				if gameStarted then
 					if menuVisible then
@@ -983,147 +1029,20 @@ function love.keypressed(key)
 			return
 		end
 
-		if key == "backspace" then
-			RoundData.time = 0
-		end
-
-		if key == "f11" then
-			Fullscreen = not Fullscreen
-			love.window.setFullscreen(Fullscreen)
-			equipSound:clone():play()
-		end
-
 		if menuVisible then
 			if key == "up" or key == "w" then
 				movemenuSound:clone():play()
-				menu:selectUp()
+				menu:selectNext()
 				return
 			elseif key == "down" or key == "s" then
 				movemenuSound:clone():play()
-				menu:selectDown()
+				menu:selectLast()
 				return
 			end
 		end
 
 		if menuVisible and (key == "return" or key == "z") then -- lovely code
-			local selectedItem = menu.selectedIndex
-			local currentscreen = menu.currentScreen
-			selectSound:clone():play()
-			if currentscreen == "menu" and selectedItem == 1 then
-				menuVisible = false
-				gameRunning = true
-				gameStarted = true
-				settingsVisible = false
-				IntroPlaying = true
-				IntroFrame = 1
-
-				updateDiscordPresence()
-			end
-			if currentscreen == "menu" and selectedItem == 2 then
-				menu:setScreen("settings")
-				menuVisible = true
-				settingsVisible = true
-			end
-
-			if currentscreen == "menu" and selectedItem == 3 then
-				menu:setScreen("oldstayputs")
-				menuVisible = true
-			end
-
-			if currentscreen == "oldstayputs" and selectedItem == 1 then
-				menu:setScreen("menu")
-				menuVisible = true
-			end
-
-			if currentscreen == "oldstayputs" and selectedItem == 2 then
-				love.system.openURL("https://codetorch.net/en/projects/117367")
-			end
-
-			if currentscreen == "oldstayputs" and selectedItem == 3 then
-				love.system.openURL("https://stayput.my.canva.site/")
-			end
-
-			if currentscreen == "menu" and selectedItem == 4 then
-				if gameStarted then
-					if quitCount >= 3 then
-						love.event.quit()
-					else
-						quitCount = quitCount + 1
-					end
-				else
-					love.event.quit()
-				end
-			end
-
-			if currentscreen == "settings" and selectedItem == 1 then
-				menuVisible = true
-				menu:setScreen("menu")
-			end
-
-			if currentscreen == "settings" and selectedItem == 2 then
-				Fullscreen = not Fullscreen
-				love.window.setFullscreen(Fullscreen)
-				equipSound:clone():play()
-			end
-
-			if currentscreen == "settings" and selectedItem == 3 then
-				menuVisible = true
-				menu:setScreen("keybinds")
-			end
-
-			if currentscreen == "settings" and selectedItem == 4 then
-				menuVisible = true
-				menu:setScreen("audiosettings")
-			end
-
-			if currentscreen == "settings" and selectedItem == 5 then
-				FPSCountToggle = not FPSCountToggle
-				equipSound:clone():play()
-			end
-
-			if currentscreen == "keybinds" and selectedItem == 1 then
-				menuVisible = true
-				menu:setScreen("settings")
-			end
-
-			if currentscreen == "audiosettings" and selectedItem == 1 then
-				menuVisible = true
-				menu:setScreen("settings")
-			end
-
-			if currentscreen == "keybinds" and selectedItem == 2 then
-				keybind_WIP_timer = 5
-				keybind_toBeEdited = "Jump"
-			end
-
-			if currentscreen == "keybinds" and selectedItem == 2 then
-				keybind_WIP_timer = 5
-				keybind_toBeEdited = "Jump"
-			end
-
-			if currentscreen == "keybinds" and selectedItem == 3 then
-				keybind_WIP_timer = 5
-				keybind_toBeEdited = "Left"
-			end
-
-			if currentscreen == "keybinds" and selectedItem == 4 then
-				keybind_WIP_timer = 5
-				keybind_toBeEdited = "Right"
-			end
-
-			if currentscreen == "keybinds" and selectedItem == 5 then
-				keybind_WIP_timer = 5
-				keybind_toBeEdited = "Down"
-			end
-
-			if currentscreen == "keybinds" and selectedItem == 6 then
-				keybind_WIP_timer = 5
-				keybind_toBeEdited = "Dash"
-			end
-
-			if currentscreen == "audiosettings" and selectedItem == 2 then
-				editingMasterVolume = true
-			end
+			
 		end
 
 		local elapsed
@@ -1163,9 +1082,7 @@ function love.keypressed(key)
 				selectSound:clone():play()
 			end
 		end
-		if key == "0" then --dev key
-			player.hp = 0
-		end
+		
 	else
 		if keybind_WIP_timer > 0 then
 			if key == "escape" then
@@ -1227,6 +1144,8 @@ function love.mousepressed(mx, my, button)
 			end
 		end
 	end
+
+	menu:mousepressed(mx,my,button)
 end
 
 -- Discord presence refresh

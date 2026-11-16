@@ -33,3 +33,123 @@ old gameover screen deltarune
 		--	 love.graphics.setColor(color2)
 		--	 love.graphics.print(item, x, 500, 0, 1, 1)
 		--end
+
+
+local selectedItem = menu.selectedIndex
+			local currentscreen = menu.currentScreen
+			selectSound:clone():play()
+			if currentscreen == "menu" and selectedItem == 1 then
+				menuVisible = false
+				gameRunning = true
+				gameStarted = true
+				settingsVisible = false
+				IntroPlaying = true
+				IntroFrame = 1
+
+				updateDiscordPresence()
+			end
+			if currentscreen == "menu" and selectedItem == 2 then
+				menu:setScreen("settings")
+				menuVisible = true
+				settingsVisible = true
+			end
+
+			if currentscreen == "menu" and selectedItem == 3 then
+				menu:setScreen("oldstayputs")
+				menuVisible = true
+			end
+
+			if currentscreen == "oldstayputs" and selectedItem == 1 then
+				menu:setScreen("menu")
+				menuVisible = true
+			end
+
+			if currentscreen == "oldstayputs" and selectedItem == 2 then
+				love.system.openURL("https://codetorch.net/en/projects/117367")
+			end
+
+			if currentscreen == "oldstayputs" and selectedItem == 3 then
+				love.system.openURL("https://stayput.my.canva.site/")
+			end
+
+			if currentscreen == "menu" and selectedItem == 4 then
+				if gameStarted then
+					if quitCount >= 3 then
+						love.event.quit()
+					else
+						quitCount = quitCount + 1
+					end
+				else
+					love.event.quit()
+				end
+			end
+
+			if currentscreen == "settings" and selectedItem == 1 then
+				menuVisible = true
+				menu:setScreen("menu")
+			end
+
+			if currentscreen == "settings" and selectedItem == 2 then
+				Fullscreen = not Fullscreen
+				love.window.setFullscreen(Fullscreen)
+				equipSound:clone():play()
+			end
+
+			if currentscreen == "settings" and selectedItem == 3 then
+				menuVisible = true
+				menu:setScreen("keybinds")
+			end
+
+			if currentscreen == "settings" and selectedItem == 4 then
+				menuVisible = true
+				menu:setScreen("audiosettings")
+			end
+
+			if currentscreen == "settings" and selectedItem == 5 then
+				FPSCountToggle = not FPSCountToggle
+				equipSound:clone():play()
+			end
+
+			if currentscreen == "keybinds" and selectedItem == 1 then
+				menuVisible = true
+				menu:setScreen("settings")
+			end
+
+			if currentscreen == "audiosettings" and selectedItem == 1 then
+				menuVisible = true
+				menu:setScreen("settings")
+			end
+
+			if currentscreen == "keybinds" and selectedItem == 2 then
+				keybind_WIP_timer = 5
+				keybind_toBeEdited = "Jump"
+			end
+
+			if currentscreen == "keybinds" and selectedItem == 2 then
+				keybind_WIP_timer = 5
+				keybind_toBeEdited = "Jump"
+			end
+
+			if currentscreen == "keybinds" and selectedItem == 3 then
+				keybind_WIP_timer = 5
+				keybind_toBeEdited = "Left"
+			end
+
+			if currentscreen == "keybinds" and selectedItem == 4 then
+				keybind_WIP_timer = 5
+				keybind_toBeEdited = "Right"
+			end
+
+			if currentscreen == "keybinds" and selectedItem == 5 then
+				keybind_WIP_timer = 5
+				keybind_toBeEdited = "Down"
+			end
+
+			if currentscreen == "keybinds" and selectedItem == 6 then
+				keybind_WIP_timer = 5
+				keybind_toBeEdited = "Dash"
+			end
+
+			if currentscreen == "audiosettings" and selectedItem == 2 then
+				editingMasterVolume = true
+			end
